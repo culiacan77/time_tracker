@@ -18,8 +18,8 @@ extern "C" void app_main(void) {
       MOTOR_PIN_4); // l'ordre des entrée du moteur est 1-3-2-4
 
   while (true) {
-    MyStepper.Step();
+    MyStepper.Step(true);
     printf("Step envoyée\n");
-    vTaskDelay(pdMS_TO_TICKS(80));
+    vTaskDelay(pdMS_TO_TICKS(10));
   }
 }

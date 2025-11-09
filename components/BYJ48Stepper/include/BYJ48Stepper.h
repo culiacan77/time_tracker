@@ -1,7 +1,9 @@
-#ifndef BYJ48Stepper_h
-#define BYJ48Stepper_h
+#ifndef BYJ48STEPPER_H
+#define BYJ48STEPPER_H
+
 #include "driver/gpio.h"
 
+// ================== Classe de base ==================
 class Stepper {
 public:
   Stepper(int steps_per_rotation);
@@ -15,17 +17,12 @@ protected:
   int steps_per_rotation_;
 };
 
+// ================== Classe 4-pin ==================
 class FourPinStepper : public Stepper {
 public:
   FourPinStepper(int steps_per_rotation, gpio_num_t motor_pin_0,
                  gpio_num_t motor_pin_1, gpio_num_t motor_pin_2,
-                 gpio_num_t motor_pin_3)
-      : Stepper(steps_per_rotation) {
-    motor_pins_[0] = motor_pin_0;
-    motor_pins_[1] = motor_pin_1;
-    motor_pins_[2] = motor_pin_2;
-    motor_pins_[3] = motor_pin_3;
-  }
+                 gpio_num_t motor_pin_3);
 
   void Step(bool clockwise = true) override;
 
@@ -34,4 +31,4 @@ private:
   static int sequence_array_[4];
 };
 
-#endif
+#endif // BYJ48STEPPER_H
