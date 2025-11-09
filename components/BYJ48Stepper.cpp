@@ -8,7 +8,7 @@
 
 // définition du constructeur de la classe Stepper
 Stepper::Stepper(steps_per_rotation)
-    : stepsPerRotation_(steps_per_rotation), // liste d'initialisation
+    : steps_per_rotation_(steps_per_rotation), // liste d'initialisation
       current_step_(0) {
   // initialisation de l'attribut current_step_ à 0 mieux vaut faire ça qu'une
   // attribution dans le constructeur (currentStep_ = 0) c'est une bonne
@@ -18,6 +18,13 @@ Stepper::Stepper(steps_per_rotation)
   // la valeur 0 (un const ne peut pas changer) problème similaire avec les
   // pointeurs.
 }
+
+int FourPinStepper::sequence_array_[4] = {0b1010, 0b0110, 0b0101, 0b1001};
+// séquence de rotation du moteur. 0b est une convention pour indiquer aux
+// humains qu'il s'agit d'une notation binaire. On aurait aussi pu mettre 10,
+// 6, 5 et 9, qui sont stocké dans le programme en binaire et correspondent à
+// la séquence 1010, 0110, 0101, 1001. la séquence 1010 va être utilisé pour
+// mettre 1 sur la 1ère pin, 0 sur la 2ème, 1 sur la 3ème et 0 sur la 4ème
 
 // définition de la méthode step
 void FourPinStepper::Step(bool clockwise) {
@@ -42,13 +49,13 @@ void FourPinStepper::Step(bool clockwise) {
 }
 
 // commentaires détaillent le cas i = 0
-for (int i = 0, i < 4, i++) {
+for (int i = 0; i < 4; i++) {
   gpio_set_level(motor_pins_[i], 0); // extinction de tous les moteurs
 }
 
 int current_sequence = sequence_array_[sequence_array_index_];
 
-for (int i = 0, i < 4, i++) {
+for (int i = 0; i < 4; i++) {
   if (current_sequence & (1 << i)) {
     // on récupère l'entrée du tableau selon current_sequence, ex la 1ère
     // séquence. on utilise la logique AND grâce à &. On utilise le masque

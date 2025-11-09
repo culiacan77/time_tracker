@@ -77,20 +77,11 @@ public:
 private:
   int motor_pins_[4]; // array de 4 int
 
-  static int sequence_array_[4] = {
-    // partagé par toutes les instances de cette classes et les classes
-    // dérivées (de cette classe) si il y en avaient
-    0b1010,
-    0b0110,
-    0b0101,
-    0b1001
-  } // initialisation d'un tablea de 4 entrée, contenant les 4
-    // positions de la
-  // séquence de rotation du moteur. 0b est une convention pour indiquer aux
-  // humains qu'il s'agit d'une notation binaire. On aurait aussi pu mettre 10,
-  // 6, 5 et 9, qui sont stocké dans le programme en binaire et correspondent à
-  // la séquence 1010, 0110, 0101, 1001. la séquence 1010 va être utilisé pour
-  // mettre 1 sur la 1ère pin, 0 sur la 2ème, 1 sur la 3ème et 0 sur la 4ème
+  static int sequence_array_[4];
+  // partagé par toutes les instances de cette classes et les classes
+  // dérivées (de cette classe) si il y en avaient
+  // on définira la séquence d'allumage des coils du moteur pour le faire
+  // tourner dans le .cpp
 };
 
 #endif
