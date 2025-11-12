@@ -21,7 +21,9 @@ bool Stepper::ResetStep() {
 int Stepper::CurrentStep() { return current_step_; }
 
 // ---------------- FourPinStepper ----------------
-int FourPinStepper::sequence_array_[4] = {0b1001, 0b0110, 0b1100, 0b0011};
+int FourPinStepper::sequence_array_[4] = {
+    0b1000, 0b0100, 0b0010,
+    0b0001}; // previously 0b1001, 0b0110, 0b1100, 0b0011
 
 // 🔧 Constructeur : configure les GPIO en sortie
 FourPinStepper::FourPinStepper(int steps_per_rotation, gpio_num_t motor_pin_0,
