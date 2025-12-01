@@ -34,8 +34,11 @@
  */
 
 // ensure this library description is only included once
-#ifndef BYJ48Stepper_h
-#define BYJ48Stepper_h
+#pragma once
+
+#include "driver/gpio.h"
+
+const int number_of_pin = 4;
 
 class Stepper {
 public:
@@ -48,7 +51,7 @@ public:
   // droit de l'appeler depuis cette classe (Stepper). on doit l'appeler depuis
   // une instance de classe dééivée
 
-  bool ResetStep();
+  virtual bool ResetStep() = 0;
   int CurrentStep();
 
 protected: // si j'avais mis private: les méthodes ne peuvent pas être appelées
@@ -56,41 +59,29 @@ protected: // si j'avais mis private: les méthodes ne peuvent pas être appelé
   // attributs ne peuvent pas être redéfinis dans la classe fille où en
   // dehors de la classe.
 
-  int current_step_;
   int steps_per_rotation_;
+  int current_step_;
 };
 
 // classe enfant/dérivée héritant de la classe stepper (parent), si un
 // utilisateur veut faire une class 2 pin, libre à lui.
 class FourPinStepper : public Stepper {
 public:
-  // constructors avec liste d'initialisation. Le : introduit la liste
-  // d'initialisation
-  FourPinStepper(int motor_pin_0, int motor_pin_1, int motor_pin_2,
-                 int motor_pin_3)
-      : motor_pins_[0](motor_pin_0), motor_pins_[1](motor_pin_1),
-        motor_pins_[2](motor_pin_2), motor_pins_[3](motor_pin_3) {}
+  // constructors (on ne peut pas faire de liste d'initialisation dans un
+  // header)
+  FourPinStepper(int steps_per_rotation, gpio_num_t motor_pin_0,
+                 gpio_num_t motor_pin_1, gpio_num_t motor_pin_2,
+                 gpio_num_t motor_pin_3);
 
-  void Step() override; // annonce qu'on va redéfinire la méthode Step. Possible
-                        // car déclaré virtual dans Stepper
+  void Step(bool clockwise = true)
+      override; // annonce qu'on va redéfinire la méthode Step. Possible
+                // car déclaré virtual dans Stepper. Il faut mettre le même
+                // paramètre que celui de la méthode qu'on override.
+
+  bool ResetStep() override;
 
 private:
-  int motor_pins_[4]; // array de 4 int
-
-  static int sequence_array_[4] = {
-    // partagé par toutes les instances de cette classes et les classes
-    // dérivées (de cette classe) si il y en avaient
-    0b1010,
-    0b0110,
-    0b0101,
-    0b1001
-  } // initialisation d'un tablea de 4 entrée, contenant les 4
-    // positions de la
-  // séquence de rotation du moteur. 0b est une convention pour indiquer aux
-  // humains qu'il s'agit d'une notation binaire. On aurait aussi pu mettre 10,
-  // 6, 5 et 9, qui sont stocké dans le programme en binaire et correspondent à
-  // la séquence 1010, 0110, 0101, 1001. la séquence 1010 va être utilisé pour
-  // mettre 1 sur la 1ère pin, 0 sur la 2ème, 1 sur la 3ème et 0 sur la 4ème
+  gpio_num_t
+      motor_pins_[number_of_pin]; // array de 4 gpio_num_t, ce sont des sortes
+                                  // de int relatif au numéro de GPIO
 };
-
-#endif
