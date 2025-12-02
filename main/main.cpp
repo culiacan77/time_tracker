@@ -6,6 +6,7 @@
 #include "esp_system.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "led_strip.h"
 #include "sdkconfig.h"
 #include <inttypes.h>
 #include <stdio.h>
