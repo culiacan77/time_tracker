@@ -290,6 +290,34 @@ void app_main(void) { // fonction principale
 
 //---------------------objectif----------------------------------------------
 
+// --> instancier 3 objets clockwheel
+// --> fonction de clockwheel
+// --> clean code
+class Clockwheel {
+
+public:
+  Clockwheel(gpio_num_t Switch_up, gpio_num_t Switch_down,
+             int64_t MotorUpdateFrequency, int kMotorStepNumber,
+             gpio_num_t motor_pin_0, gpio_num_t motor_pin_1,
+             gpio_num_t motor_pin_2, gpio_num_t motor_pin_3)
+      : motor_(kMotorStepNumber, motor_pin_0, motor_pin_1, motor_pin_2,
+               motor_pin_3),
+        Switch_up_(Switch_up), Switch_dow_(Switch_down),
+        MotorUpdateFrequency_(MotorUpdateFrequency) {}
+
+private:
+  FourPinStepper motor; // composition, clockwheel HAS A motor
+
+  int LastPosition = 0;
+  gpio_num_t Switch_up_;
+  gpio_num_t Switch_dow_;
+  int64_t MotorUpdateFrequency_;
+};
+
+Clockwheel minuteWheel();
+Clockwheel hourWheel();
+Clockwheel dayWheel();
+
 // ClockWheel minuteWheel(&MyStepper1, kMotorMinuteFrequency,
 // MINUTE_SWITCH_UP_PIN,
 //                            MINUTE_SWITCH_DOWN_PIN);
