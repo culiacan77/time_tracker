@@ -173,12 +173,8 @@ QueueHandle_t
 
 void Motor_Task(void *pvParameter) {
 
-  motor_state Current_Mode = motor_state::MOTOR_STATE_DEFAULT;
-  motor_state previous_Mode = motor_state::MOTOR_STATE_DEFAULT;
-
-  // initialisé lors du 1er appel de la fonction. Comme on a un while true et
-  // qu'on utilise les task, on ne rapelle pas la fonction, elle continue de
-  // s'éxécuter en boucle.
+  motor_state Current_Mode = motor_state::MOTOR_STATE_DEFAULT;  // delete
+  motor_state previous_Mode = motor_state::MOTOR_STATE_DEFAULT; // delete
 
   // start ledstrip
   led_strip_handle_t led_strip = configure_led();
@@ -187,10 +183,9 @@ void Motor_Task(void *pvParameter) {
 
   while (true) {
 
-    bool clockwiseRotation =
-        gpio_get_level(MINUTE_SWITCH_DOWN_PIN); // c'est la valeur sur la pin 17
-                                                // qui donne le sens de rotation
-    bool shouleReset = gpio_get_level(MINUTE_SWITCH_UP_PIN);
+    bool clockwiseRotation =                                 // delete
+        gpio_get_level(MINUTE_SWITCH_DOWN_PIN);              // delete
+    bool shouleReset = gpio_get_level(MINUTE_SWITCH_UP_PIN); // delete
 
     // On prend le temps pour un tour et on le divise par le nombre de pas. ça
     // nous donne le temps pour 1 pas. On divise le temps actuel par le temps
@@ -199,7 +194,7 @@ void Motor_Task(void *pvParameter) {
     // la 2ème formule pour éviter la perte de précision d'une double division
 
     // temps depuis le démarrage en microsecondes
-    int64_t current_time = esp_timer_get_time();
+    int64_t current_time = esp_timer_get_time(); // delete
 
     // set up state of the motor: stop, clockwise, counter-clockwise,
     //  reset position
@@ -213,7 +208,7 @@ void Motor_Task(void *pvParameter) {
       }
     }
 
-    int MinuteMotorCurrentStep =
+    int MinuteMotorCurrentStep = // delete
         (current_time * kMotorStepNumber / kMotorMinuteFrequency) %
         kMotorStepNumber;
 
@@ -303,25 +298,84 @@ public:
       : motor_(kMotorStepNumber, motor_pin_0, motor_pin_1, motor_pin_2,
                motor_pin_3),
         Switch_up_(Switch_up), Switch_dow_(Switch_down),
-        MotorUpdateFrequency_(MotorUpdateFrequency) {}
+        MotorUpdateFrequency_(MotorUpdateFrequency) {};
+
+  void Update(int64_t current_time) {
+    SetMotorState();
+    OperateMotor(current_time);
+  };
 
 private:
-  FourPinStepper motor; // composition, clockwheel HAS A motor
+  FourPinStepper motor_; // composition, clockwheel HAS A motor
 
   int LastPosition = 0;
   gpio_num_t Switch_up_;
   gpio_num_t Switch_dow_;
   int64_t MotorUpdateFrequency_;
+
+  // initialisé lors de la création de l'objet.
+  motor_state Current_Mode = motor_state::MOTOR_STATE_DEFAULT;
+  motor_state previous_Mode = motor_state::MOTOR_STATE_DEFAULT;
+
+  void SetMotorState() {
+
+    // la valeur lue sur la pin
+    // donne le sens de rotation
+    bool clockwiseRotation = gpio_get_level(Switch_dow_);
+    bool shouleReset = gpio_get_level(Switch_up_);
+
+    // set up state of the motor: stop, clockwise, counter-clockwise,
+    //  reset position
+    if (shouleReset == 1 && clockwiseRotation == 1) {
+      Current_Mode = motor_state::MOTOR_STATE_DEFAULT;
+    } else { // turn motor CW or anti CW
+      if (clockwiseRotation == 0) {
+        Current_Mode = motor_state::MOTOR_STATE_CW;
+      } else {
+        Current_Mode = motor_state::MOTOR_STATE_CCW;
+      }
+    }
+  }
+
+  void OperateMotor(int64_t current_time) {
+
+    // on récupère le nombre de step pour un tour du moteur qui a été transmis à
+    // la classe Stepper. Comme la classe FourPinStepper en est dérivée, on peut
+    // appeler la méthode depuis cette dernière
+    const int kGettedMotorStepNumber_ = motor_.get_steps_per_rotation();
+    // On prend le temps pour un tour et on le divise par le nombre de pas. ça
+    // nous donne le temps pour 1 pas. On divise le temps actuel par le temps
+    // pour 1 pas, ce qui donne le nombre de pas actuel. On utilise un modulo
+    // pour garder cette valeur entre 0 et 2048. A/B/C = A/(B*C), on va utiliser
+    // la 2ème formule pour éviter la perte de précision d'une double division
+    int MotorCurrentStep =
+        (current_time * kGettedMotorStepNumber_ / MotorUpdateFrequency_) %
+        kGettedMotorStepNumber_;
+
+    switch (Current_Mode) {
+
+    case (motor_state::MOTOR_STATE_RESET):
+      motor_.ResetStep();
+      break;
+    case (motor_state::MOTOR_STATE_CW):
+      motor_.Step(true);
+      break;
+    case (motor_state::MOTOR_STATE_CCW):
+      motor_.Step(false);
+      break;
+    case (motor_state::MOTOR_STATE_DEFAULT):
+      if (MotorCurrentStep != LastPosition) {
+        motor_.Step(true);
+      }
+      break;
+    }
+    LastPosition = MotorCurrentStep;
+    previous_Mode = Current_Mode;
+  }
 };
 
-Clockwheel minuteWheel();
-Clockwheel hourWheel();
-Clockwheel dayWheel();
+//---------------------TEMP--------------------------------------------------
 
-// ClockWheel minuteWheel(&MyStepper1, kMotorMinuteFrequency,
-// MINUTE_SWITCH_UP_PIN,
-//                            MINUTE_SWITCH_DOWN_PIN);
-//
 // while(true) {
 //   int64_t current_time = esp_timer_get_time();
 //   minuteWheel.Update(current_time);
@@ -329,3 +383,21 @@ Clockwheel dayWheel();
 //   dayWheel.Update(current_time);
 //   vTaskDelay(pdMS_TO_TICKS(kLoopDelayMs));
 // }
+
+//-----------------SUITE PROGRAMME PRINCIPAL-----------------------------
+Clockwheel minuteWheel(MINUTE_SWITCH_UP_PIN, MINUTE_SWITCH_DOWN_PIN,
+                       kMotorStepNumber, kMotorMinuteFrequency MOTOR_1_PIN_1,
+                       MOTOR_1_PIN_3, MOTOR_1_PIN_2, MOTOR_1_PIN_4);
+Clockwheel hourWheel();
+Clockwheel dayWheel();
+
+// enlever code en trop (celui qui est mntnt dans la classe clockwheel)
+// créer la task qui gère les clockwheel
+//  calculer currentTime
+//  appel de Update(currentTime)
+//  appel de OperateMotor
+//  vTaskDelay
+
+// renommer selon convention
+
+// la led de status est une classe séparée,
