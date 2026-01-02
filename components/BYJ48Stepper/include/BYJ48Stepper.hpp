@@ -51,6 +51,8 @@ public:
   // droit de l'appeler depuis cette classe (Stepper). on doit l'appeler depuis
   // une instance de classe dééivée
 
+  // méthode getter
+  int get_steps_per_rotation() { return steps_per_rotation_; };
   virtual bool ResetStep() = 0;
   int CurrentStep();
 
