@@ -90,15 +90,20 @@ constexpr gpio_num_t MOTOR_2_PIN_2 = GPIO_NUM_10;
 constexpr gpio_num_t MOTOR_2_PIN_3 = GPIO_NUM_9;
 constexpr gpio_num_t MOTOR_2_PIN_4 = GPIO_NUM_14;
 
+constexpr gpio_num_t MOTOR_3_PIN_1 = GPIO_NUM_11;
+constexpr gpio_num_t MOTOR_3_PIN_2 = GPIO_NUM_13;
+constexpr gpio_num_t MOTOR_3_PIN_3 = GPIO_NUM_12;
+constexpr gpio_num_t MOTOR_3_PIN_4 = GPIO_NUM_4;
+
 constexpr gpio_num_t BUILD_IN_LED_PIN =
     GPIO_NUM_47; // pourquoi le numéro n'a pas d'influence?
 
 constexpr gpio_num_t MINUTE_SWITCH_UP_PIN = GPIO_NUM_21;
 constexpr gpio_num_t MINUTE_SWITCH_DOWN_PIN = GPIO_NUM_17;
-// constexpr gpio_num_t HOUR_SWITCH_UP_PIN = GPIO_NUM_X;
-// constexpr gpio_num_t HOUR_SWITCH_DOWN_PIN = GPIO_NUM_X;
-// constexpr gpio_num_t DAY_SWITCH_UP_PIN = GPIO_NUM_X;
-// constexpr gpio_num_t DAY_SWITCH_DOWN_PIN = GPIO_NUM_X;
+constexpr gpio_num_t HOUR_SWITCH_UP_PIN = GPIO_NUM_34;
+constexpr gpio_num_t HOUR_SWITCH_DOWN_PIN = GPIO_NUM_35;
+constexpr gpio_num_t DAY_SWITCH_UP_PIN = GPIO_NUM_33;
+constexpr gpio_num_t DAY_SWITCH_DOWN_PIN = GPIO_NUM_36;
 
 // déclaration struct type gpio_config_t pr configurer gpio
 gpio_config_t SWITCH_BUTTON_MOTOR_GPIO_CONFIGURATION =
@@ -159,135 +164,6 @@ led_strip_handle_t configure_led(void) {
   return led_strip;
 }
 
-//  attention, l'ordre des arguments des pin de moteurs doit être 1 3 2 4
-//(le 3 et le 2 sont inversés)
-FourPinStepper MyStepper1(kMotorStepNumber, MOTOR_1_PIN_1, MOTOR_1_PIN_3,
-                          MOTOR_1_PIN_2, MOTOR_1_PIN_4);
-
-FourPinStepper MyStepper2(kMotorStepNumber, MOTOR_2_PIN_1, MOTOR_2_PIN_3,
-                          MOTOR_2_PIN_2, MOTOR_2_PIN_4);
-
-QueueHandle_t
-    queueEvents; // permet aux fonction à qui on passe cet handle de manipuler
-                 // la queue, similaire à ce qu'on a vu avec les taskhandle.
-
-void Motor_Task(void *pvParameter) {
-
-  motor_state Current_Mode = motor_state::MOTOR_STATE_DEFAULT;  // delete
-  motor_state previous_Mode = motor_state::MOTOR_STATE_DEFAULT; // delete
-
-  // start ledstrip
-  led_strip_handle_t led_strip = configure_led();
-  RGB color{0, 0, 0};
-  int offset = 0;
-
-  while (true) {
-
-    bool clockwiseRotation =                                 // delete
-        gpio_get_level(MINUTE_SWITCH_DOWN_PIN);              // delete
-    bool shouleReset = gpio_get_level(MINUTE_SWITCH_UP_PIN); // delete
-
-    // On prend le temps pour un tour et on le divise par le nombre de pas. ça
-    // nous donne le temps pour 1 pas. On divise le temps actuel par le temps
-    // pour 1 pas, ce qui donne le nombre de pas actuel. On utilise un modulo
-    // pour garder cette valeur entre 0 et 2048. A/B/C = A/(B*C), on va utiliser
-    // la 2ème formule pour éviter la perte de précision d'une double division
-
-    // temps depuis le démarrage en microsecondes
-    int64_t current_time = esp_timer_get_time(); // delete
-
-    // set up state of the motor: stop, clockwise, counter-clockwise,
-    //  reset position
-    if (shouleReset == 1 && clockwiseRotation == 1) {
-      Current_Mode = motor_state::MOTOR_STATE_DEFAULT;
-    } else { // turn motor CW or anti CW
-      if (clockwiseRotation == 0) {
-        Current_Mode = motor_state::MOTOR_STATE_CW;
-      } else {
-        Current_Mode = motor_state::MOTOR_STATE_CCW;
-      }
-    }
-
-    int MinuteMotorCurrentStep = // delete
-        (current_time * kMotorStepNumber / kMotorMinuteFrequency) %
-        kMotorStepNumber;
-
-    switch (Current_Mode) {
-    case (motor_state::MOTOR_STATE_RESET):
-      MyStepper1.ResetStep();
-      // on donne l'adresse de color pour que la fonction puisse modifier les
-      // valeurs à l'intérieur
-      HexToRGB(static_cast<int>(build_in_led_color::MOTOR_COLOR_WHITE), &color);
-
-      break;
-    case (motor_state::MOTOR_STATE_CW):
-      MyStepper1.Step(true);
-
-      HexToRGB(static_cast<int>(build_in_led_color::MOTOR_COLOR_BLUE), &color);
-      break;
-    case (motor_state::MOTOR_STATE_CCW):
-      MyStepper1.Step(false);
-      HexToRGB(static_cast<int>(build_in_led_color::MOTOR_COLOR_GREEN), &color);
-      break;
-    case (motor_state::MOTOR_STATE_DEFAULT):
-      if (MinuteMotorCurrentStep != LastPosition) {
-        MyStepper1.Step(true);
-      }
-      HexToRGB(static_cast<int>(build_in_led_color::MOTOR_COLOR_RED), &color);
-      break;
-    }
-    LastPosition = MinuteMotorCurrentStep;
-    // update led strip with the new values
-    ESP_ERROR_CHECK(
-        led_strip_set_pixel(led_strip, 0, color.Red, color.Green, color.Blue));
-    ESP_ERROR_CHECK(led_strip_refresh(led_strip));
-
-    if (previous_Mode != Current_Mode) {
-      ESP_LOGI(TAG, "MOTOR_STATE : %s", get_mode_name(Current_Mode));
-      ESP_LOGI(TAG, "clockwiseRotation is: %d \n", clockwiseRotation);
-    }
-
-    previous_Mode = Current_Mode;
-
-    vTaskDelay(pdMS_TO_TICKS(kLoopDelayMs)); // attendre 12ms
-  }
-}
-
-//}
-// sert à faire faire le liens entre C++ et C (Esp-IDF est à la base prévu
-// pour C)
-extern "C" {
-void app_main(void);
-}
-
-void app_main(void) { // fonction principale
-
-  SWITCH_BUTTON_MOTOR_GPIO_CONFIGURATION.intr_type = GPIO_INTR_DISABLE;
-  SWITCH_BUTTON_MOTOR_GPIO_CONFIGURATION.mode = GPIO_MODE_INPUT;
-  SWITCH_BUTTON_MOTOR_GPIO_CONFIGURATION.pin_bit_mask =
-      (1ULL << MINUTE_SWITCH_UP_PIN) | (1ULL << MINUTE_SWITCH_DOWN_PIN);
-  // 1ull signifie 1 en binaire, U veut dire unsign donc forcément positif
-  // LL veut dire Long Long (64 bits). On combine les masque grâce à |
-
-  SWITCH_BUTTON_MOTOR_GPIO_CONFIGURATION.pull_down_en = GPIO_PULLDOWN_DISABLE;
-  SWITCH_BUTTON_MOTOR_GPIO_CONFIGURATION.pull_up_en = GPIO_PULLUP_ENABLE;
-
-  ESP_ERROR_CHECK(gpio_config(&SWITCH_BUTTON_MOTOR_GPIO_CONFIGURATION));
-  // ESP_ERROR_CHECK arrête le programme si retourne un message d'erreur autre
-  // que ESP-OK. gpio_config paramêtre les gpio selon le struct qu'on lui
-  // passe en argument
-
-  queueEvents = xQueueCreate(1, sizeof(int));
-  // creation de la queue avec 1 message max, chaque message = 1 int
-
-  xTaskCreate(&Motor_Task, "Motor_Task", 4096, NULL, 5, NULL);
-}
-
-//---------------------objectif----------------------------------------------
-
-// --> instancier 3 objets clockwheel
-// --> fonction de clockwheel
-// --> clean code
 class Clockwheel {
 
 public:
@@ -374,30 +250,90 @@ private:
   }
 };
 
-//---------------------TEMP--------------------------------------------------
+QueueHandle_t
+    queueEvents; // permet aux fonction à qui on passe cet handle de manipuler
+                 // la queue, similaire à ce qu'on a vu avec les taskhandle.
 
-// while(true) {
-//   int64_t current_time = esp_timer_get_time();
-//   minuteWheel.Update(current_time);
-//   hourWheel.Update(current_time);
-//   dayWheel.Update(current_time);
-//   vTaskDelay(pdMS_TO_TICKS(kLoopDelayMs));
-// }
-
-//-----------------SUITE PROGRAMME PRINCIPAL-----------------------------
+// création des instances de clockwheel
 Clockwheel minuteWheel(MINUTE_SWITCH_UP_PIN, MINUTE_SWITCH_DOWN_PIN,
                        kMotorStepNumber, kMotorMinuteFrequency MOTOR_1_PIN_1,
                        MOTOR_1_PIN_3, MOTOR_1_PIN_2, MOTOR_1_PIN_4);
-Clockwheel hourWheel();
-Clockwheel dayWheel();
+Clockwheel hourWheel(HOUR_SWITCH_UP_PIN, HOUR_SWITCH_DOWN_PIN, kMotorStepNumber,
+                     kMotorHourFrequency MOTOR_2_PIN_1, MOTOR_2_PIN_3,
+                     MOTOR_2_PIN_2, MOTOR_2_PIN_4);
+// Clockwheel dayWheel(DAY_SWITCH_UP_PIN, DAY_SWITCH_DOWN_PIN,
+// kMotorStepNumber,
+//                     kMotorDayFrequency MOTOR_3_PIN_1, MOTOR_3_PIN_3,
+//                     MOTOR_3_PIN_2, MOTOR_3_PIN_4);
 
-// enlever code en trop (celui qui est mntnt dans la classe clockwheel)
-// créer la task qui gère les clockwheel
-//  calculer currentTime
-//  appel de Update(currentTime)
-//  appel de OperateMotor
-//  vTaskDelay
+void Motor_Task(void *pvParameter) {
+
+  while (true) {
+    // temps depuis le démarrage en microsecondes
+    int64_t current_time = esp_timer_get_time();
+    minuteWheel.Update(current_time);
+    hourWheel.Update(current_time);
+    // dayWheel.Update(current_time);
+    vTaskDelay(pdMS_TO_TICKS(kLoopDelayMs)); // attendre 12ms
+  }
+}
+
+//}
+// sert à faire faire le liens entre C++ et C (Esp-IDF est à la base prévu
+// pour C)
+extern "C" {
+void app_main(void);
+}
+
+void app_main(void) { // fonction principale
+
+  SWITCH_BUTTON_MOTOR_GPIO_CONFIGURATION.intr_type = GPIO_INTR_DISABLE;
+  SWITCH_BUTTON_MOTOR_GPIO_CONFIGURATION.mode = GPIO_MODE_INPUT;
+  SWITCH_BUTTON_MOTOR_GPIO_CONFIGURATION.pin_bit_mask =
+      (1ULL << MINUTE_SWITCH_UP_PIN) | (1ULL << MINUTE_SWITCH_DOWN_PIN);
+  // 1ull signifie 1 en binaire, U veut dire unsign donc forcément positif
+  // LL veut dire Long Long (64 bits). On combine les masque grâce à |
+
+  SWITCH_BUTTON_MOTOR_GPIO_CONFIGURATION.pull_down_en = GPIO_PULLDOWN_DISABLE;
+  SWITCH_BUTTON_MOTOR_GPIO_CONFIGURATION.pull_up_en = GPIO_PULLUP_ENABLE;
+
+  ESP_ERROR_CHECK(gpio_config(&SWITCH_BUTTON_MOTOR_GPIO_CONFIGURATION));
+  // ESP_ERROR_CHECK arrête le programme si retourne un message d'erreur autre
+  // que ESP-OK. gpio_config paramêtre les gpio selon le struct qu'on lui
+  // passe en argument
+
+  queueEvents = xQueueCreate(1, sizeof(int));
+  // creation de la queue avec 1 message max, chaque message = 1 int
+
+  xTaskCreate(&Motor_Task, "Motor_Task", 4096, NULL, 5, NULL);
+}
+
+//-----------------SUITE PROGRAMME PRINCIPAL-----------------------------
 
 // renommer selon convention
 
-// la led de status est une classe séparée,
+// la led de status est une classe séparée.
+
+// on donne l'adresse de color pour que la fonction puisse modifier les
+// valeurs à l'intérieur
+HexToRGB(static_cast<int>(build_in_led_color::MOTOR_COLOR_WHITE), &color);
+
+// update led strip with the new values
+ESP_ERROR_CHECK(led_strip_set_pixel(led_strip, 0, color.Red, color.Green,
+                                    color.Blue));
+ESP_ERROR_CHECK(led_strip_refresh(led_strip));
+
+// préparer fonction de log pour debugger la classe clockwheel
+if (previous_Mode != Current_Mode) {
+  ESP_LOGI(TAG, "MOTOR_STATE : %s", get_mode_name(Current_Mode));
+  ESP_LOGI(TAG, "clockwiseRotation is: %d \n", clockwiseRotation);
+}
+
+//---ledstrip status led task...............
+// start ledstrip
+led_strip_handle_t led_strip = configure_led();
+RGB color{0, 0, 0};
+int offset = 0;
+
+// les 3 derniers commits ont étés fait dans main mais j'aurais du les faire
+// dans la branch. 2.1.25 19h04

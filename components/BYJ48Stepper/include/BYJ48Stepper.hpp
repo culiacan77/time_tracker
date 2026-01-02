@@ -71,6 +71,8 @@ class FourPinStepper : public Stepper {
 public:
   // constructors (on ne peut pas faire de liste d'initialisation dans un
   // header)
+  // Attention, l'ordre des arguments des pin de moteurs doit être 1 3 2 4
+  //(le 3 et le 2 sont inversés)
   FourPinStepper(int steps_per_rotation, gpio_num_t motor_pin_0,
                  gpio_num_t motor_pin_1, gpio_num_t motor_pin_2,
                  gpio_num_t motor_pin_3);
