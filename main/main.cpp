@@ -17,13 +17,13 @@ extern "C" void app_main(void) {
   printf("Booting... waiting for stabilization\n"); // message de debug
   vTaskDelay(pdMS_TO_TICKS(1000)); // attente de 1 sec pour ne plus avoir valeur
                                    // changeante sur straping pin
-  FourPinStepper MyStepper(
-      MOTOR_STEP_NUMBER, MOTOR_PIN_1, MOTOR_PIN_2, MOTOR_PIN_3,
-      MOTOR_PIN_4); // ne marche pas avec ordre 1 2 3 4 // 1 3 2 4
+  FourPinStepper MyStepper(MOTOR_STEP_NUMBER, MOTOR_PIN_1, MOTOR_PIN_2,
+                           MOTOR_PIN_3,
+                           MOTOR_PIN_4); // ne marche pas avec ordre 1 2 3 4
 
   while (true) {
     MyStepper.Step(true);
     printf("Step envoyée\n");
-    vTaskDelay(pdMS_TO_TICKS(300));
+    vTaskDelay(pdMS_TO_TICKS(10));
   }
 }
