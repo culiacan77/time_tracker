@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 idf_component_register(
     SRCS "main.cpp"
     INCLUDE_DIRS "."
@@ -9,3 +10,9 @@ idf_component_register(
                                   #C'est une automatisation qui nous simplifie la vie dans le sens ou comme les fichiers sont parcourus automatiquement
                                   #on a pas besoin de fournir les path de ce qu'on inclus.
 )
+=======
+idf_component_register(SRCS "main.cpp"
+                    INCLUDE_DIRS "."
+                    REQUIRES BYJ48Stepper driver
+                    REQUIRES esp_timer) #REQUIRES driver changé pour REQUIRES BYJ48Stepper driver
+>>>>>>> 8e704f166c44933ac91895bf2b7e1fd2c0d4830f
