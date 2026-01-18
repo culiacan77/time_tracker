@@ -9,6 +9,7 @@
 #include "esp_err.h"
 #include "esp_log.h"
 #include "esp_timer.h"
+#include "led_panel.hpp"
 #include "led_strip.h"
 #include "sdkconfig.h"
 #include "stepper-motor-4p.hpp"
@@ -48,6 +49,8 @@ constexpr int64_t kMotorMinuteFrequency = 60e6; // 60 * 10^6
 constexpr int64_t kMotorHourFrequency = kMotorMinuteFrequency * 60;
 constexpr int64_t kMotorDayFrequency = kMotorHourFrequency * 24;
 
+constexpr int kUpdateDelayMs = 50; // delay time in ms for the led panel update
+
 //  attention, l'ordre des arguments des pin de moteurs doit être 1 3 2 4
 //(le 3 et le 2 sont inversés)
 
@@ -67,8 +70,10 @@ void app_main(void) {
   rmt_config.resolution_hz = kLedStripRmtResHz;
 
   led_strip_handle_t led_strip;
-  ESP_ERROR_CHECK(
-      led_strip_new_rmt_device(&strip_config, &rmt_config, &led_strip));
+  ESP_ERROR_CHECK(led_strip_new_rmt_device(
+      &strip_config, &rmt_config,
+      &led_strip)); // assigne les paramètre de led_strip_config et rmt_config à
+                    // led_strip
   ESP_LOGI(kTag, "Created LED strip object with RMT backend");
 
   int64_t current_time = esp_timer_get_time();
@@ -101,3 +106,18 @@ void app_main(void) {
     vTaskDelay(pdMS_TO_TICKS(kLoopDelayMs)); // attendre 12ms
   }
 }
+// clockwheel n est pas une tache freertos.
+//  switch up = turn cw | neutral normal | down = turn ccw | 3 Up = reset
+//  utiliser freertos queue pour communiquer etat reset à led panel
+//  créer task ledpanel
+//  créer objet led panel à partir de class led strip ? ou créer class puis
+//  objet led panel ? switch led panel: left: pause device | center: run normal|
+//  right: change led color rainbow. attention. en mode pause les clockwheels en
+//  position neutre arretent de tourner.
+//  reimprimer couvercle. ne pas y mettre d'inser.
+//  souder chargeur.
+//  assembler le tout.
+
+//----------QUESTIONEMENT------------------
+// le fichier cmakelists.txt du dossier led-panel doit il inclure led_strip.h ?
+// je crois pas
