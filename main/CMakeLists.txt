@@ -1,4 +1,5 @@
 <<<<<<< HEAD
+<<<<<<< HEAD
 idf_component_register(
     SRCS "main.cpp"
     INCLUDE_DIRS "."
@@ -16,3 +17,8 @@ idf_component_register(SRCS "main.cpp"
                     REQUIRES BYJ48Stepper driver
                     REQUIRES esp_timer) #REQUIRES driver changé pour REQUIRES BYJ48Stepper driver
 >>>>>>> 8e704f166c44933ac91895bf2b7e1fd2c0d4830f
+=======
+idf_component_register(SRCS "main.cpp" "clockwheel.cpp"
+                    INCLUDE_DIRS "."
+                    ) 
+>>>>>>> 6529d3f9b116523d76b1d92b84388d0b6768ebbc
