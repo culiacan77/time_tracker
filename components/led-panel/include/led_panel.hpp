@@ -6,6 +6,7 @@
 
 #include "driver/gpio.h"
 #include "led_strip.h"
+#include <vector>
 
 // position des leds à allumer selon le pattern
 namespace LightingPattern {
@@ -16,39 +17,37 @@ constexpr uint64_t KPAUSE = 0x123789;
 
 class LedPanel {
 public:
-  /**
-   * @param kLedPanelNumber: number of leds in the panel
-   * @param kLedLifespan time before a turned on led is turned off;
-   * @param lightingPattern lighting order of the leds;
-   * @param kLightingPatternSpeed speed of the lighting pattern;
-   */
-  LedPanel(int kLedPanelNumber, int kLedLifespan, int kLightingPattern,
-           gpio_num_t switch_left, gpio_num_t switch_right,
-           int updateFrequency);
+  LedPanel(gpio_num_t gpioPin, led_strip_rmt_config_t *rmt_config);
 
   /**
    *Set the time origin to synchronize motor position.
    *@param current_time Current time in microseconds.
    */
-  void SetTimeOrigin(int64_t current_time);
 
-  void Update(int64_t current_time);
+  void litLedPanel();
+
+  void
+  setAnimationPattern(const std::vector<std::vector<int>> &currentLightPattern);
+  void setTrailLength(int trailLength);
+  void updateMatrix();
+  void clearLedPanelMatrix();
 
 protected:
 private:
-  int LedTrail_; // nbr led allumées derrière la led principale
-  int lightingPattern_;
-  int LightingPatternSpeed_;
-  int64_t time_origin_; // aussi nommé ainsi dans clockwheel problème ?
-  int current_position_ = 0;
-  int ledPanelIndex_ = 0;
-  uint64_t currentLedPattern_;
-  int currentPatternLength_;
-  uint64_t currentPattern; // store current lighting pattern
-  gpio_num_t switch_left_;
-  gpio_num_t switch_right_;
-  int updateFrequency_;
-  double update_tracker_ = 0.0;
+  // matrice représentant l'indice de luminosité du led panel
+  std::vector<std::vector<int>> ledPanelMatrix_{
+      {0, 0, 0}, {0, 0, 0}, {0, 0, 0}};
+  std::vector<std::vector<int>> LightingPattern_;
 
-  int getPatternLength(uint64_t ledPattern);
+  int LightingPatternIndex_ = 0;
+  int LightingPatternSize_;
+  std::vector<int> BrightnessLUT_;
+  led_strip_handle_t led_strip_handle_;
 };
+
+// selon l'état des boutons, --SetAnimationPattern et --setBrightnessLUT
+// --setLedPanelMatrix vont déterminé quel vecteur (patern), et l'échelle de
+// brighness de la trail.
+
+// dimLedPanel Update matrix, litLedPanel vont gérer
+//  l'animation dans la loop principale.

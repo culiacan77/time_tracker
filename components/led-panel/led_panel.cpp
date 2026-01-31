@@ -3,132 +3,136 @@
 // SPDX-License-Identifier: MIT
 
 #include "led_panel.hpp"
-
 #include "driver/gpio.h"
+#include "esp_log.h"
 
-constexpr uint32_t kRed = 0x220000;
+// du à mon cablage hardware je dois corriger l'orientation entre la grille
+// software et la grille hardware. ce n'est pas exactement une rotation de 90
+// degrés anti horaire
 
-int kBrightnessLevel = 255;
+static constexpr int kLedPanelLeds =
+    9; // Définissez le nombre total de LEDs dans le panneau
 
-void led_panel::Update(int64_t current_time) {
-  // read the switch states
-  int switch_left_state = gpio_get_level(switch_left_);
-  int switch_right_state = gpio_get_level(switch_right_);
+static const int kGammaCorrection[] = {
+    0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
+    0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   1,   1,
+    1,   1,   1,   1,   1,   1,   1,   1,   1,   1,   1,   2,   2,   2,   2,
+    2,   2,   2,   2,   3,   3,   3,   3,   3,   3,   3,   4,   4,   4,   4,
+    4,   5,   5,   5,   5,   6,   6,   6,   6,   7,   7,   7,   7,   8,   8,
+    8,   9,   9,   9,   10,  10,  10,  11,  11,  11,  12,  12,  13,  13,  13,
+    14,  14,  15,  15,  16,  16,  17,  17,  18,  18,  19,  19,  20,  20,  21,
+    21,  22,  22,  23,  24,  24,  25,  25,  26,  27,  27,  28,  29,  29,  30,
+    31,  32,  32,  33,  34,  35,  35,  36,  37,  38,  39,  39,  40,  41,  42,
+    43,  44,  45,  46,  47,  48,  49,  50,  50,  51,  52,  54,  55,  56,  57,
+    58,  59,  60,  61,  62,  63,  64,  66,  67,  68,  69,  70,  72,  73,  74,
+    75,  77,  78,  79,  81,  82,  83,  85,  86,  87,  89,  90,  92,  93,  95,
+    96,  98,  99,  101, 102, 104, 105, 107, 109, 110, 112, 114, 115, 117, 119,
+    120, 122, 124, 126, 127, 129, 131, 133, 135, 137, 138, 140, 142, 144, 146,
+    148, 150, 152, 154, 156, 158, 160, 162, 164, 167, 169, 171, 173, 175, 177,
+    180, 182, 184, 186, 189, 191, 193, 196, 198, 200, 203, 205, 208, 210, 213,
+    215, 218, 220, 223, 225, 228, 231, 233, 236, 239, 241, 244, 247, 249, 252,
+    255};
 
-  // mode : 0 = no switch pressed (run normal)
-  //        1 = right switch pressed (change color)
-  //        2 = left switch pressed (pause)
-  int mode = switch_left_state << 1 | switch_right_state;
+static constexpr int kBrightnessMax_ = 180; // Valeur maximale de luminosité
 
-  int64_t elapsed_time = current_time - time_origin_;
+static const char *kTag = "led_panel";
 
-  // Imaginons que tu calcules le temps écoulé depuis la dernière frame
-  double delta_time = elapsed_time - last_update_time_;
-  double update_tracker_ += delta_time;
+// constructeur
+LedPanel::LedPanel(gpio_num_t gpioPin, led_strip_rmt_config_t *rmt_config) {
+  // --- Initialisation du Panneau LED ---
+  led_strip_config_t panel_strip_config = {};
+  panel_strip_config.strip_gpio_num = gpioPin;
+  panel_strip_config.max_leds = kLedPanelLeds; // Utilisez le bon nombre de LEDs
+  panel_strip_config.led_model = LED_MODEL_WS2812; // Assurez-vous du bon modèle
+  panel_strip_config.color_component_format = LED_STRIP_COLOR_COMPONENT_FMT_RGB;
 
-  if (update_tracker_ >= updateFrequency_) {
-    switch (mode) {
-    case 0: // normal
-            // led_strip_ c'est le led handle
-      currentLedPattern_ = KSNAKE;
-      brightnessFadingIndex = 50;
-      LedTrail_ = 5;
-      // brightnessFadingIndex doit etre basé sur le brightness max et le
-      // ledtrail
-      break;
-    case 1: // right switch pressed: change color
-      currentLedPattern_ = KSNAKE;
-      brightnessFadingIndex = 50;
-      LedTrail_ = 5;
-      break;
-    case 2:
-      // left switch pressed: pause
-      // charger le pattern de pause
-      // assigner ledTrail à la longueur du pattern de pause
-      // brightnessFadingIndex = 0
-      currentLedPattern_ = KPAUSE;
-      brightnessFadingIndex = 0;
-      LedTrail_ = getPatternLength(currentLedPattern_, ledPanelIndex_);
-      color = kRed;
-      break;
+  ESP_ERROR_CHECK(led_strip_new_rmt_device(&panel_strip_config, rmt_config,
+                                           &led_strip_handle_));
+
+  // pas besoin d'initialiser un autre rmt_config, il va pour les deux led strip
+  ESP_LOGI(kTag, "Created Panel LED strip object");
+};
+
+void LedPanel::setAnimationPattern(
+    const std::vector<std::vector<int>> &currentLightPattern) {
+  LightingPattern_ = currentLightPattern; // le pointeur LightingPattern stock
+                                          // l'adresse de currentLightPattern
+};
+
+// integrer gamma correction
+void LedPanel::setTrailLength(int trailLength) {
+  if (trailLength < 2) {
+    trailLength = 2;
+  }
+  // vide le vecteur BrightnessLUT_
+  BrightnessLUT_.clear();
+  // remplit le vecteur BrightnessLUT_
+  for (int i = 0; i < trailLength; i++) {
+    // recuperer la valeur du tableau gamma à la position de brightnessInterval
+    // * (i + 1)
+    int brightness = i * kBrightnessMax_ / (trailLength - 1);
+    BrightnessLUT_.push_back(kGammaCorrection[brightness]);
+  }
+};
+
+void LedPanel::clearLedPanelMatrix() {
+
+  for (auto line : ledPanelMatrix_) {
+    for (int i = 0; i < line.size(); ++i) {
+      line[i] = 0;
     }
-    currentPatternLength_ = getPatternLength(currentLedPattern_);
-    current_position_ = updatePosition(currentLedPattern_, ledPanelIndex_,
-                                       currentPatternLength_);
-
-    for (int i = 0; i < LedTrail_; i++) {
-      led_strip_set_pixel(led_strip_,
-                          (current_position_ - i) % currentPatternLength_,
-                          color, color >> 16 & 0xFF - brightnessFadingIndex * i,
-                          color >> 8 & 0xFF -
-
-                                           *i,
-                          color & 0xFF - brightnessFadingIndex * i);
-    };
-    led_strip_refresh(led_strip_);
-    ledPanelIndex_++ % currentPatternLength_;
-
-    // En soustrayant updateFrequency_ de update_tracker_, on garde le
-    // "surplus" de temps pour la prochaine boucle et on évite d'incrémenter
-    // sans fin (pas d'overflow)
-    update_tracker_ -= updateFrequency_;
   }
 };
 
-// update du led panel selon le case
+void LedPanel::updateMatrix() {
+  int rowIndex = LightingPatternIndex_ % (LightingPattern_).size();
+  int rowValue = (LightingPattern_)[rowIndex][0];
+  int columnValue = (LightingPattern_)[rowIndex][1];
+  // lightTrail est aussi la valeur de brightness max
+  ledPanelMatrix_[rowValue][columnValue] = BrightnessLUT_.size();
+  // La valeur qu'on vient d'assigner dans notre matrix est plus grande de 1
+  // que l'index des elements de notre vecteur LUT, mais la suite va
+  // soustraire 1 à toutes les valeurs (ce qui gère la baisse d'intensité de
+  // la trainée). Donc si on a mit 3 dans le tableau, on se retrouve avec 2,
+  // ce qui permet d'accéder au 2ème élément du vecteur
+  int n = ledPanelMatrix_.size();
+  for (int i = 0; i < n; ++i) {   // i est l'indice de ligne (row)
+    for (int j = 0; j < n; ++j) { // j est l'indice de colonne (column)
 
-// Pour connaître la longueur réelle
-// (compte les chiffres hexadécimaux
-// non nuls)
-
-int updatePosition(uint64_t pattern, int ledPanelIndex, int patternLength) {
-  return (pattern >> (patternLength - ledPanelIndex - 1) * 4) &
-         0xF; // on est en hexadécimal, un digit = 4 bits donc 0xF -> 16 en base
-              // 10 -> 1111 en binaire
-};
-
-int LedPanel::getPatternLength(uint64_t pattern) {
-  int patternLength = 0;
-  while (pattern > 0) {
-    pattern >> 1; // décale les bits de pattern de 1 vers la droite
-    patternLength++;
+      if (ledPanelMatrix_[i][j] > 0) {
+        // décrémente l'index de luminosité
+        ledPanelMatrix_[i][j]--;
+      }
+    }
   }
-  return patternLength;
+  LightingPatternIndex_++;
 };
 
-int LedPanel::getPatternLength(uint64_t pattern) {
-  if (pattern == 0)
-    return 0;
-  int length = 0;
-  while (pattern > 0) {
-    pattern >>= 4; // On décale de 4 bits vers la droite, et on update pattern
-                   // avec cette nouvelle valeur (fait grâce au =) (dans les
-                   // faits ça supprime le chifre le plus à droite)
-    length++;
+void LedPanel::litLedPanel() {
+
+  const uint8_t HUE_RED = 0;
+  const uint8_t SATURATION_MAX = 255;
+  int n = ledPanelMatrix_.size();
+  // Copie les éléments de l'ancienne matrice vers la nouvelle matrice
+  for (int i = 0; i < n; ++i) {   // i est l'indice de ligne (row)
+    for (int j = 0; j < n; ++j) { // j est l'indice de colonne (column)
+
+      int brightness =
+          BrightnessLUT_[ledPanelMatrix_[i][j]]; // Récupère la valeur de
+                                                 // luminosités
+
+      ESP_LOGI(kTag, "brightness[%d][%d]=%d", i, j, brightness);
+
+      int ledIndex = j * n + i; // calcule l'index de la led
+      led_strip_set_pixel_hsv(led_strip_handle_, ledIndex, HUE_RED,
+                              SATURATION_MAX, brightness);
+    }
   }
-  return length;
+  // Affiche toutes les LEDs mises à jour en même temps
+  led_strip_refresh(led_strip_handle_);
 };
 
-// on est pas en binaire ou on cherche a lire des 0 et des 1 mais des
-// valeures de 0 à 9. On va utiliser l'hexadecimale, soit 2^4 bit pour
-// encoder un chiffre (donc valeures de 0 à 15). Si on avait pris 2^3
-// on aurait pas pu lire le 9 car valeurs de 0 à 8. comme on a des
-// packet de 4 bits alloués à chaque chiffre une fois converti en
-// binaire (ce dont a besoin l'ordi) il est nécessaire de corriger la
-// position en multiqpliant par 4. 0xF crée un masque de 4 bits, à
-// savoir: 1111. on aurait pas pu utiliser octodécimal (2^3) bits pour
-// contenir la valeur d'un digit car elle va de 0 à 8. ok ça fait 9
-// valeurs mais nous il nous en faut 10, de 0 à 9 c'est ça
-
-//------------------TRASH-----------------
-
-// trop couteux en mémoire d'utiliser log10. Mieux vaut faire du bitshifting.
-
-// int LedPanel::getPatternLength(int n) {
-//  return floor(log10(n) + 1);
-//};
-
-// log10(x) nous retourne la puissance qu'il faut mettre à 10 pour former le
-// nombre x. floors enlève la partie décimale du log10. ça nous dit à quelle
-// puissance élever 10 pour trouver x mais n'a pas pris en compte les unités,
-// donc on rajoute 1
+// problème: light trail devra etre défini de par l'exterieur.
+// faire en sorte d'avoir une fonction qui parcour le tableau et lui donner un
+// pointeur vers une fonction dans sa définition. lors de son appel on pourra
+// donner la fonction dim / clear our lit comme argument.

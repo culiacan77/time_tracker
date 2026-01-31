@@ -4,7 +4,7 @@
 
 #include <inttypes.h>
 
-#include "clockwheel.hpp"
+#include "clockwheel.hpp" //pk pas besoin de include Clockwheel.cpp ?
 #include "driver/gpio.h" //permet de paramettrer les gpio en tant qu'input/output, pupllup/pulldown
 #include "esp_err.h"
 #include "esp_log.h"
@@ -13,9 +13,10 @@
 #include "led_strip.h"
 #include "sdkconfig.h"
 #include "stepper-motor-4p.hpp"
+#include <vector>
 
 // tag pour les messages de debug
-const char *kTag = "main";
+static const char *kTag = "main";
 
 constexpr gpio_num_t kMinuteMotorPin1 = GPIO_NUM_1;
 constexpr gpio_num_t kMinuteMotorPin2 = GPIO_NUM_5;
@@ -41,6 +42,11 @@ constexpr gpio_num_t kHourSwitchDownPin = GPIO_NUM_35;
 constexpr gpio_num_t kDaySwitchUpPin = GPIO_NUM_33;
 constexpr gpio_num_t kDaySwitchDownPin = GPIO_NUM_36;
 
+constexpr gpio_num_t kLedPanelPin = GPIO_NUM_38;
+
+extern std::vector<std::vector<int>>
+    LedPattern; // ??? déjà dans ledpanel.cpp non ?
+
 constexpr int kLedStripRmtResHz = (10 * 1000 * 1000);
 constexpr int kLoopDelayMs = 12; // delay time in ms for the main loop
 constexpr int kMotorStepNumber = 2048;
@@ -51,14 +57,23 @@ constexpr int64_t kMotorDayFrequency = kMotorHourFrequency * 24;
 
 constexpr int kUpdateDelayMs = 50; // delay time in ms for the led panel update
 
-//  attention, l'ordre des arguments des pin de moteurs doit être 1 3 2 4
-//(le 3 et le 2 sont inversés)
+// liste position des leds à allumer selon le pattern
+// mode pause
+static const std::vector<std::vector<int>> kLightPatternStop = {
+    {0, 0}, {1, 0}, {2, 0}, {0, 2}, {1, 2}, {2, 2}};
+// mode normal + rainbow (sans fade pr full lit)
+static const std::vector<std::vector<int>> kLightPatternRun = {
+    {0, 0}, {0, 1}, {0, 2}, {1, 2}, {1, 1}, {1, 0}, {2, 0}, {2, 1}, {2, 2}};
+// mode reset
+static const std::vector<std::vector<int>> kLightPatternReset = {
+    {0, 1}, {0, 0}, {1, 0}, {2, 0}, {2, 1}, {2, 2}, {1, 2}, {0, 2}};
 
 extern "C" {
 void app_main(void);
 }
 
 void app_main(void) {
+  // --- Initialisation de la LED de status ---
   led_strip_config_t strip_config = {};
   strip_config.strip_gpio_num = kStatusLedPin;
   strip_config.max_leds = 1;
@@ -75,6 +90,9 @@ void app_main(void) {
       &led_strip)); // assigne les paramètre de led_strip_config et rmt_config à
                     // led_strip
   ESP_LOGI(kTag, "Created LED strip object with RMT backend");
+
+  std::vector<std::vector<int>> LedPattern = {
+      {0, 255, 255}, {255, 0, 0}, {0, 0, 0}};
 
   int64_t current_time = esp_timer_get_time();
 
@@ -97,14 +115,28 @@ void app_main(void) {
   ClockWheel day_clock_wheel(kDaySwitchUpPin, kDaySwitchDownPin,
                              kMotorDayFrequency, day_stepper_motor,
                              current_time);
+  LedPanel myLedPanel(kLedPanelPin, &rmt_config);
+
+  // confiure trail length and fill trail brightness vector
+  myLedPanel.setTrailLength(6);
+  // Appelez la fonction pour allumer le panneau avec votre pattern et le handle
+  myLedPanel.setAnimationPattern(kLightPatternReset);
+  myLedPanel.updateMatrix();
+  myLedPanel.litLedPanel();
 
   while (true) {
-    current_time = esp_timer_get_time();
-    minute_clock_wheel.Update(current_time);
-    hour_clock_wheel.Update(current_time);
-    day_clock_wheel.Update(current_time);
-    vTaskDelay(pdMS_TO_TICKS(kLoopDelayMs)); // attendre 12ms
-  }
+    myLedPanel.updateMatrix();
+    vTaskDelay(pdMS_TO_TICKS(100)); // provisoire. Devra être géré par la task.
+    myLedPanel.litLedPanel();
+  };
+
+  // while (true) {
+  //   current_time = esp_timer_get_time();
+  //   minute_clock_wheel.Update(current_time);
+  //   hour_clock_wheel.Update(current_time);
+  //   day_clock_wheel.Update(current_time);
+  //   vTaskDelay(pdMS_TO_TICKS(kLoopDelayMs)); // attendre 12ms
+  // }
 }
 // clockwheel n est pas une tache freertos.
 //  switch up = turn cw | neutral normal | down = turn ccw | 3 Up = reset
@@ -121,3 +153,5 @@ void app_main(void) {
 //----------QUESTIONEMENT------------------
 // le fichier cmakelists.txt du dossier led-panel doit il inclure led_strip.h ?
 // je crois pas
+
+// ajouter le ledhandle pour le ledpanel
