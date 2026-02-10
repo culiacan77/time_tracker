@@ -37,6 +37,8 @@ static constexpr int kBrightnessMax_ = 180; // Valeur maximale de luminosité
 
 static const char *kTag = "led_panel";
 
+const int HueRange = 360;
+
 // constructeur
 LedPanel::LedPanel(gpio_num_t gpioPin, led_strip_rmt_config_t *rmt_config) {
   // --- Initialisation du Panneau LED ---
@@ -110,7 +112,6 @@ void LedPanel::updateMatrix() {
 
 void LedPanel::litLedPanel() {
 
-  const uint8_t HUE_RED = 0;
   const uint8_t SATURATION_MAX = 255;
   int n = ledPanelMatrix_.size();
   // Copie les éléments de l'ancienne matrice vers la nouvelle matrice
@@ -124,13 +125,15 @@ void LedPanel::litLedPanel() {
       ESP_LOGI(kTag, "brightness[%d][%d]=%d", i, j, brightness);
 
       int ledIndex = j * n + i; // calcule l'index de la led
-      led_strip_set_pixel_hsv(led_strip_handle_, ledIndex, HUE_RED,
-                              SATURATION_MAX, brightness);
+      led_strip_set_pixel_hsv(led_strip_handle_, ledIndex, Hue_, SATURATION_MAX,
+                              brightness);
     }
   }
   // Affiche toutes les LEDs mises à jour en même temps
   led_strip_refresh(led_strip_handle_);
 };
+
+void LedPanel::shiftLedColor() { Hue_ = (Hue_++) % HueRange; };
 
 // problème: light trail devra etre défini de par l'exterieur.
 // faire en sorte d'avoir une fonction qui parcour le tableau et lui donner un
