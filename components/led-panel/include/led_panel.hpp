@@ -13,6 +13,7 @@ namespace LightingPattern {
 constexpr uint64_t KSNAKE = 0x147852369;
 constexpr uint64_t KCirclePattern = 0x14789632;
 constexpr uint64_t KPAUSE = 0x123789;
+constexpr uint64_t KFULLLIT = 0x123456789;
 } // namespace LightingPattern
 
 class LedPanel {
@@ -31,6 +32,7 @@ public:
   void setTrailLength(int trailLength);
   void updateMatrix();
   void clearLedPanelMatrix();
+  void shiftLedColor();
 
 protected:
 private:
@@ -43,6 +45,7 @@ private:
   int LightingPatternSize_;
   std::vector<int> BrightnessLUT_;
   led_strip_handle_t led_strip_handle_;
+  int Hue_ = 0; // variable pour stocker la teinte actuelle du panneau
 };
 
 // selon l'état des boutons, --SetAnimationPattern et --setBrightnessLUT
