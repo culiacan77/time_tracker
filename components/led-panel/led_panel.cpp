@@ -10,9 +10,8 @@
 // software et la grille hardware. ce n'est pas exactement une rotation de 90
 // degrés anti horaire
 
-static constexpr int kLedPanelLeds =
-    9; // Définissez le nombre total de LEDs dans le panneau
-
+// table de correction gamma pour compenser la non linéarité de la perception
+// visuelle
 static const int kGammaCorrection[] = {
     0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
     0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   1,   1,
@@ -33,27 +32,41 @@ static const int kGammaCorrection[] = {
     215, 218, 220, 223, 225, 228, 231, 233, 236, 239, 241, 244, 247, 249, 252,
     255};
 
-static constexpr int kBrightnessMax_ = 30; // Valeur maximale de luminosité
+static constexpr int kBrightnessMax_ =
+    100; // Valeur maximale de luminosité, low brightness limit available tint
+
+// liste position des leds à allumer selon le pattern
+// mode pause
+static const std::vector<std::vector<int>> kLightPatternStop = {
+    {0, 0}, {1, 0}, {2, 0}, {0, 2}, {1, 2}, {2, 2}};
+// mode normal + rainbow (sans fade pr full lit)
+static const std::vector<std::vector<int>> kLightPatternRun = {
+    {0, 0}, {0, 1}, {0, 2}, {1, 2}, {1, 1}, {1, 0}, {2, 0}, {2, 1}, {2, 2}};
+// mode reset
+static const std::vector<std::vector<int>> kLightPatternReset = {
+    {0, 1}, {0, 0}, {1, 0}, {2, 0}, {2, 1}, {2, 2}, {1, 2}, {0, 2}};
+
+static const std::vector<std::vector<int>> kFullLit = {
+    {0, 0}, {0, 1}, {0, 2}, {1, 0}, {1, 1}, {1, 2}, {2, 0}, {2, 1}, {2, 2}};
 
 static const char *kTag = "led_panel";
 
 const int HueRange = 360;
 
 // constructeur
-LedPanel::LedPanel(gpio_num_t Switch_up, gpio_num_t Switch_down,
-                   gpio_num_t gpioPin, led_strip_rmt_config_t *rmt_config)
-    : switch_up_(Switch_up), switch_down_(Switch_down) {
-  // --- Initialisation du Panneau LED ---
-  led_strip_config_t panel_strip_config = {};
-  panel_strip_config.strip_gpio_num = gpioPin;
-  panel_strip_config.max_leds = kLedPanelLeds; // Utilisez le bon nombre de LEDs
-  panel_strip_config.led_model = LED_MODEL_WS2812; // Assurez-vous du bon modèle
-  panel_strip_config.color_component_format = LED_STRIP_COLOR_COMPONENT_FMT_RGB;
+LedPanel::LedPanel(gpio_num_t switch_up, gpio_num_t switch_down,
+                   gpio_num_t gpioPin, led_strip_handle_t led_strip_handle)
+    : switch_up_(switch_up), switch_down_(switch_down),
+      led_strip_handle_(led_strip_handle) {
+  LightingPattern_ = kLightPatternRun;
+  gpio_config_t io_conf = {};
+  io_conf.intr_type = GPIO_INTR_DISABLE;
+  io_conf.mode = GPIO_MODE_INPUT;
+  io_conf.pin_bit_mask = (1ULL << switch_up_) | (1ULL << switch_down_);
+  io_conf.pull_down_en = GPIO_PULLDOWN_DISABLE;
+  io_conf.pull_up_en = GPIO_PULLUP_ENABLE;
+  ESP_ERROR_CHECK(gpio_config(&io_conf));
 
-  ESP_ERROR_CHECK(led_strip_new_rmt_device(&panel_strip_config, rmt_config,
-                                           &led_strip_handle_));
-
-  // pas besoin d'initialiser un autre rmt_config, il va pour les deux led strip
   ESP_LOGI(kTag, "Created Panel LED strip object");
 };
 
@@ -142,6 +155,31 @@ void LedPanel::shiftLedColor() {
   Hue_ %= HueRange; // Then wrap around
 };
 
+void LedPanel::update() {
+  int switch_up_state = gpio_get_level(switch_up_);
+  int switch_down_state = gpio_get_level(switch_down_);
+
+  // mode : 3 = switch neutral position (run normal)
+  //        1 = switch left position (stop clockwheel)
+  //        2 = switch right position (change led color)
+  int mode = switch_up_state << 1 | switch_down_state;
+
+  switch (mode) {
+  case 3: // normal operation
+    this->setAnimationPattern(kLightPatternRun);
+
+    break;
+  case 1: // switch left position (stop clockwheel)
+    this->setAnimationPattern(kLightPatternStop);
+
+    break;
+  case 2: // switch right position (change led color)
+    this->setAnimationPattern(kFullLit);
+    this->shiftLedColor();
+
+    break;
+  }
+};
 // problème: light trail devra etre défini de par l'exterieur.
 // faire en sorte d'avoir une fonction qui parcour le tableau et lui donner un
 // pointeur vers une fonction dans sa définition. lors de son appel on pourra

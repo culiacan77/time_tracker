@@ -10,11 +10,16 @@
 #include "driver/gpio.h" //permet de paramettrer les gpio en tant qu'input/output, pupllup/pulldown
 #include "esp_err.h"
 #include "esp_log.h"
+#include "esp_system.h"
 #include "esp_timer.h"
+#include "freertos/FreeRTOS.h" //fonctions de freeRTOS
+#include "freertos/task.h"     //fonctions de freeRTOS
 #include "led_panel.hpp"
 #include "led_strip.h"
 #include "sdkconfig.h"
 #include "stepper-motor-4p.hpp"
+#include <stdio.h>
+
 
 // tag pour les messages de debug
 static const char *kTag = "main";
@@ -75,19 +80,7 @@ constexpr int64_t kMotorDayFrequency = kMotorHourFrequency * 24;
 
 constexpr int kUpdateDelayMs = 50; // delay time in ms for the led panel update
 
-// liste position des leds à allumer selon le pattern
-// mode pause
-static const std::vector<std::vector<int>> kLightPatternStop = {
-    {0, 0}, {1, 0}, {2, 0}, {0, 2}, {1, 2}, {2, 2}};
-// mode normal + rainbow (sans fade pr full lit)
-static const std::vector<std::vector<int>> kLightPatternRun = {
-    {0, 0}, {0, 1}, {0, 2}, {1, 2}, {1, 1}, {1, 0}, {2, 0}, {2, 1}, {2, 2}};
-// mode reset
-static const std::vector<std::vector<int>> kLightPatternReset = {
-    {0, 1}, {0, 0}, {1, 0}, {2, 0}, {2, 1}, {2, 2}, {1, 2}, {0, 2}};
-
-static const std::vector<std::vector<int>> kFullLit = {
-    {0, 0}, {0, 1}, {0, 2}, {1, 0}, {1, 1}, {1, 2}, {2, 0}, {2, 1}, {2, 2}};
+static constexpr int kLedPanelLeds = 9; // nbr LEDs dans le panneau
 
 bool shouldDimLight =
     true; // variable globale pour indiquer si les LEDs doivent être atténuées
@@ -97,7 +90,7 @@ void app_main(void);
 }
 
 void app_main(void) {
-  // configuration Clockwheel
+  // ------------------configuration CLOCKWHEEL------------------
   // --- Initialisation de la LED de status clockheel--
   led_strip_config_t strip_config = {};
   strip_config.strip_gpio_num = kStatusLedPin;
@@ -110,6 +103,7 @@ void app_main(void) {
   rmt_config.resolution_hz = kLedStripRmtResHz;
 
   led_strip_handle_t led_strip;
+
   ESP_ERROR_CHECK(led_strip_new_rmt_device(
       &strip_config, &rmt_config,
       &led_strip)); // assigne les paramètre de led_strip_config et
@@ -138,22 +132,35 @@ void app_main(void) {
                              kMotorDayFrequency, day_stepper_motor,
                              current_time);
 
-  // configuration du led panel
+  // ---------------configuration du LED PANEL----------------
+  led_strip_config_t ledPanel_strip_config = {};
+  ledPanel_strip_config.strip_gpio_num = kLedPanelPin;
+  ledPanel_strip_config.max_leds =
+      kLedPanelLeds; // Utilisez le bon nombre de LEDs
+  ledPanel_strip_config.led_model =
+      LED_MODEL_WS2812; // Assurez-vous du bon modèle
+  ledPanel_strip_config.color_component_format =
+      LED_STRIP_COLOR_COMPONENT_FMT_RGB;
+
+  // led_strip_rmt_config_t rmt_config  similaire à celui de status led utilisé
+  // par Clockwheel
+
+  led_strip_handle_t ledPanel_led_strip;
+
+  ESP_ERROR_CHECK(led_strip_new_rmt_device(&ledPanel_strip_config, &rmt_config,
+                                           &ledPanel_led_strip));
 
   LedPanel myLedPanel(kLedPanelSwitchUp, kLedPanelSwitchDown, kLedPanelPin,
-                      &rmt_config);
+                      ledPanel_led_strip);
   // confiure trail length and fill trail brightness vector
   myLedPanel.setTrailLength(6);
-  // Appelez la fonction pour allumer le panneau avec votre pattern et le
-  // handle
-  myLedPanel.setAnimationPattern(kFullLit);
 
   // boucle test led panel
   while (true) {
     // myLedPanel.shouldDimLight_ = false;
     vTaskDelay(pdMS_TO_TICKS(100)); // provisoire. Devra être géré par la task
+    myLedPanel.update();
     myLedPanel.updateMatrix(shouldDimLight);
-    myLedPanel.shiftLedColor();
     myLedPanel.litLedPanel();
   };
 
