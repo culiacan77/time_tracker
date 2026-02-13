@@ -33,7 +33,7 @@ static const int kGammaCorrection[] = {
     215, 218, 220, 223, 225, 228, 231, 233, 236, 239, 241, 244, 247, 249, 252,
     255};
 
-static constexpr int kBrightnessMax_ = 180; // Valeur maximale de luminosité
+static constexpr int kBrightnessMax_ = 30; // Valeur maximale de luminosité
 
 static const char *kTag = "led_panel";
 
@@ -86,7 +86,7 @@ void LedPanel::clearLedPanelMatrix() {
   }
 };
 
-void LedPanel::updateMatrix() {
+void LedPanel::updateMatrix(bool shouldDimLight_) {
   int rowIndex = LightingPatternIndex_ % (LightingPattern_).size();
   int rowValue = (LightingPattern_)[rowIndex][0];
   int columnValue = (LightingPattern_)[rowIndex][1];
@@ -97,13 +97,15 @@ void LedPanel::updateMatrix() {
   // soustraire 1 à toutes les valeurs (ce qui gère la baisse d'intensité de
   // la trainée). Donc si on a mit 3 dans le tableau, on se retrouve avec 2,
   // ce qui permet d'accéder au 2ème élément du vecteur
-  int n = ledPanelMatrix_.size();
-  for (int i = 0; i < n; ++i) {   // i est l'indice de ligne (row)
-    for (int j = 0; j < n; ++j) { // j est l'indice de colonne (column)
+  if (shouldDimLight_) {
+    int n = ledPanelMatrix_.size();
+    for (int i = 0; i < n; ++i) {   // i est l'indice de ligne (row)
+      for (int j = 0; j < n; ++j) { // j est l'indice de colonne (column)
 
-      if (ledPanelMatrix_[i][j] > 0) {
-        // décrémente l'index de luminosité
-        ledPanelMatrix_[i][j]--;
+        if (ledPanelMatrix_[i][j] > 0) {
+          // décrémente l'index de luminosité
+          ledPanelMatrix_[i][j]--;
+        }
       }
     }
   }
@@ -133,7 +135,10 @@ void LedPanel::litLedPanel() {
   led_strip_refresh(led_strip_handle_);
 };
 
-void LedPanel::shiftLedColor() { Hue_ = (Hue_++) % HueRange; };
+void LedPanel::shiftLedColor() {
+  Hue_++;           // Increment first
+  Hue_ %= HueRange; // Then wrap around
+};
 
 // problème: light trail devra etre défini de par l'exterieur.
 // faire en sorte d'avoir une fonction qui parcour le tableau et lui donner un

@@ -30,7 +30,7 @@ public:
   void
   setAnimationPattern(const std::vector<std::vector<int>> &currentLightPattern);
   void setTrailLength(int trailLength);
-  void updateMatrix();
+  void updateMatrix(bool shouldDimLight_);
   void clearLedPanelMatrix();
   void shiftLedColor();
 
@@ -40,11 +40,13 @@ private:
   std::vector<std::vector<int>> ledPanelMatrix_{
       {0, 0, 0}, {0, 0, 0}, {0, 0, 0}};
   std::vector<std::vector<int>> LightingPattern_;
-
-  int LightingPatternIndex_ = 0;
-  int LightingPatternSize_;
   std::vector<int> BrightnessLUT_;
   led_strip_handle_t led_strip_handle_;
+
+  bool shouldDimLight_ =
+      true; // variable pour indiquer si les LEDs doivent être atténuées
+  int LightingPatternIndex_ = 0;
+  int LightingPatternSize_;
   int Hue_ = 0; // variable pour stocker la teinte actuelle du panneau
 };
 
