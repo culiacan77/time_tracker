@@ -40,7 +40,9 @@ static const char *kTag = "led_panel";
 const int HueRange = 360;
 
 // constructeur
-LedPanel::LedPanel(gpio_num_t gpioPin, led_strip_rmt_config_t *rmt_config) {
+LedPanel::LedPanel(gpio_num_t Switch_up, gpio_num_t Switch_down,
+                   gpio_num_t gpioPin, led_strip_rmt_config_t *rmt_config)
+    : switch_up_(Switch_up), switch_down_(Switch_down) {
   // --- Initialisation du Panneau LED ---
   led_strip_config_t panel_strip_config = {};
   panel_strip_config.strip_gpio_num = gpioPin;

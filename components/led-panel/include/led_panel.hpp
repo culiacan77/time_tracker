@@ -18,7 +18,8 @@ constexpr uint64_t KFULLLIT = 0x123456789;
 
 class LedPanel {
 public:
-  LedPanel(gpio_num_t gpioPin, led_strip_rmt_config_t *rmt_config);
+  LedPanel(gpio_num_t Switch_up, gpio_num_t Switch_down, gpio_num_t gpioPin,
+           led_strip_rmt_config_t *rmt_config);
 
   /**
    *Set the time origin to synchronize motor position.
@@ -42,6 +43,8 @@ private:
   std::vector<std::vector<int>> LightingPattern_;
   std::vector<int> BrightnessLUT_;
   led_strip_handle_t led_strip_handle_;
+  gpio_num_t switch_up_;
+  gpio_num_t switch_down_;
 
   bool shouldDimLight_ =
       true; // variable pour indiquer si les LEDs doivent être atténuées

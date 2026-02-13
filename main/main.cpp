@@ -60,6 +60,9 @@ constexpr gpio_num_t kHourSwitchDownPin = GPIO_NUM_35;
 constexpr gpio_num_t kDaySwitchUpPin = GPIO_NUM_33;
 constexpr gpio_num_t kDaySwitchDownPin = GPIO_NUM_36;
 
+constexpr gpio_num_t kLedPanelSwitchUp = GPIO_NUM_16;
+constexpr gpio_num_t kLedPanelSwitchDown = GPIO_NUM_18;
+
 constexpr gpio_num_t kLedPanelPin = GPIO_NUM_38;
 
 constexpr int kLedStripRmtResHz = (10 * 1000 * 1000);
@@ -94,7 +97,8 @@ void app_main(void);
 }
 
 void app_main(void) {
-  // --- Initialisation de la LED de status ---
+  // configuration Clockwheel
+  // --- Initialisation de la LED de status clockheel--
   led_strip_config_t strip_config = {};
   strip_config.strip_gpio_num = kStatusLedPin;
   strip_config.max_leds = 1;
@@ -133,8 +137,11 @@ void app_main(void) {
   ClockWheel day_clock_wheel(kDaySwitchUpPin, kDaySwitchDownPin,
                              kMotorDayFrequency, day_stepper_motor,
                              current_time);
-  LedPanel myLedPanel(kLedPanelPin, &rmt_config);
 
+  // configuration du led panel
+
+  LedPanel myLedPanel(kLedPanelSwitchUp, kLedPanelSwitchDown, kLedPanelPin,
+                      &rmt_config);
   // confiure trail length and fill trail brightness vector
   myLedPanel.setTrailLength(6);
   // Appelez la fonction pour allumer le panneau avec votre pattern et le
@@ -142,22 +149,22 @@ void app_main(void) {
   myLedPanel.setAnimationPattern(kFullLit);
 
   // boucle test led panel
-  ////while (true) {
-  // myLedPanel.shouldDimLight_ = false;
-  //  vTaskDelay(pdMS_TO_TICKS(100)); // provisoire. Devra être géré par la task
-  //  myLedPanel.updateMatrix(shouldDimLight);
-  //  myLedPanel.shiftLedColor();
-  //  myLedPanel.litLedPanel();
-  // };
+  while (true) {
+    // myLedPanel.shouldDimLight_ = false;
+    vTaskDelay(pdMS_TO_TICKS(100)); // provisoire. Devra être géré par la task
+    myLedPanel.updateMatrix(shouldDimLight);
+    myLedPanel.shiftLedColor();
+    myLedPanel.litLedPanel();
+  };
 
   // boucle test moteur
-  while (true) {
-    current_time = esp_timer_get_time();
-    minute_clock_wheel.Update(current_time);
-    hour_clock_wheel.Update(current_time);
-    day_clock_wheel.Update(current_time);
-    vTaskDelay(pdMS_TO_TICKS(kLoopDelayMs)); // attendre 12ms
-  }
+  // while (true) {
+  // current_time = esp_timer_get_time();
+  //   minute_clock_wheel.Update(current_time);
+  //   hour_clock_wheel.Update(current_time);
+  //   day_clock_wheel.Update(current_time);
+  //   vTaskDelay(pdMS_TO_TICKS(kLoopDelayMs)); // attendre 12ms
+  // }
 }
 // clockwheel n est pas une tache freertos.
 //  switch up = turn cw | neutral normal | down = turn ccw | 3 Up = reset
