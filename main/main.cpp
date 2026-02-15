@@ -20,7 +20,6 @@
 #include "stepper-motor-4p.hpp"
 #include <stdio.h>
 
-
 // tag pour les messages de debug
 static const char *kTag = "main";
 
@@ -85,11 +84,49 @@ static constexpr int kLedPanelLeds = 9; // nbr LEDs dans le panneau
 bool shouldDimLight =
     true; // variable globale pour indiquer si les LEDs doivent être atténuées
 
-extern "C" {
-void app_main(void);
+//  --------TASK DEFINITION--------
+void ledPanel_Task(void *pvParameter) {
+
+  // on peut initialiser les variables utiles à LedPanel ici, pareil pour la
+  // création de l'objet.
+
+  // ---------------configuration du LED PANEL----------------
+  led_strip_rmt_config_t rmt_config = {};
+  rmt_config.clk_src = RMT_CLK_SRC_DEFAULT;
+  rmt_config.resolution_hz = kLedStripRmtResHz;
+
+  led_strip_config_t ledPanel_strip_config = {};
+  ledPanel_strip_config.strip_gpio_num = kLedPanelPin;
+  ledPanel_strip_config.max_leds =
+      kLedPanelLeds; // Utilisez le bon nombre de LEDs
+  ledPanel_strip_config.led_model =
+      LED_MODEL_WS2812; // Assurez-vous du bon modèle
+  ledPanel_strip_config.color_component_format =
+      LED_STRIP_COLOR_COMPONENT_FMT_RGB;
+
+  // led_strip_rmt_config_t rmt_config  similaire à celui de status led utilisé
+  // par Clockwheel
+
+  led_strip_handle_t ledPanel_led_strip;
+
+  ESP_ERROR_CHECK(led_strip_new_rmt_device(&ledPanel_strip_config, &rmt_config,
+                                           &ledPanel_led_strip));
+
+  LedPanel myLedPanel(kLedPanelSwitchUp, kLedPanelSwitchDown, kLedPanelPin,
+                      ledPanel_led_strip);
+  // confiure trail length and fill trail brightness vector
+  myLedPanel.setTrailLength(6);
+
+  while (1) {
+    vTaskDelay(pdMS_TO_TICKS(100)); // provisoire. Devra être géré par la task
+    myLedPanel.update();
+    myLedPanel.updateMatrix(true); // remplacer true par shouldDimLight, ajout
+                                   // en tant que parametre de task ?
+    myLedPanel.litLedPanel();
+  }
 }
 
-void app_main(void) {
+void motor_Task(void *pvParameter) {
   // ------------------configuration CLOCKWHEEL------------------
   // --- Initialisation de la LED de status clockheel--
   led_strip_config_t strip_config = {};
@@ -132,46 +169,23 @@ void app_main(void) {
                              kMotorDayFrequency, day_stepper_motor,
                              current_time);
 
-  // ---------------configuration du LED PANEL----------------
-  led_strip_config_t ledPanel_strip_config = {};
-  ledPanel_strip_config.strip_gpio_num = kLedPanelPin;
-  ledPanel_strip_config.max_leds =
-      kLedPanelLeds; // Utilisez le bon nombre de LEDs
-  ledPanel_strip_config.led_model =
-      LED_MODEL_WS2812; // Assurez-vous du bon modèle
-  ledPanel_strip_config.color_component_format =
-      LED_STRIP_COLOR_COMPONENT_FMT_RGB;
+  while (1) {
+    current_time = esp_timer_get_time();
+    minute_clock_wheel.Update(current_time);
+    hour_clock_wheel.Update(current_time);
+    day_clock_wheel.Update(current_time);
+    vTaskDelay(pdMS_TO_TICKS(kLoopDelayMs)); // attendre 12ms
+  }
+}
+extern "C" {
+void app_main(void);
+}
 
-  // led_strip_rmt_config_t rmt_config  similaire à celui de status led utilisé
-  // par Clockwheel
+void app_main(void) {
 
-  led_strip_handle_t ledPanel_led_strip;
-
-  ESP_ERROR_CHECK(led_strip_new_rmt_device(&ledPanel_strip_config, &rmt_config,
-                                           &ledPanel_led_strip));
-
-  LedPanel myLedPanel(kLedPanelSwitchUp, kLedPanelSwitchDown, kLedPanelPin,
-                      ledPanel_led_strip);
-  // confiure trail length and fill trail brightness vector
-  myLedPanel.setTrailLength(6);
-
-  // boucle test led panel
-  while (true) {
-    // myLedPanel.shouldDimLight_ = false;
-    vTaskDelay(pdMS_TO_TICKS(100)); // provisoire. Devra être géré par la task
-    myLedPanel.update();
-    myLedPanel.updateMatrix(shouldDimLight);
-    myLedPanel.litLedPanel();
-  };
-
-  // boucle test moteur
-  // while (true) {
-  // current_time = esp_timer_get_time();
-  //   minute_clock_wheel.Update(current_time);
-  //   hour_clock_wheel.Update(current_time);
-  //   day_clock_wheel.Update(current_time);
-  //   vTaskDelay(pdMS_TO_TICKS(kLoopDelayMs)); // attendre 12ms
-  // }
+  // ---------------creation des tasks----------------
+  xTaskCreate(&motor_Task, "motor_Task", 4096, NULL, 5, NULL);
+  xTaskCreate(&ledPanel_Task, "ledPanel_Task", 4096, NULL, 4, NULL);
 }
 // clockwheel n est pas une tache freertos.
 //  switch up = turn cw | neutral normal | down = turn ccw | 3 Up = reset
