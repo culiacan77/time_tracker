@@ -81,6 +81,8 @@ constexpr int kUpdateDelayMs = 50; // delay time in ms for the led panel update
 
 static constexpr int kLedPanelLeds = 9; // nbr LEDs dans le panneau
 
+bool shouldReset =
+    false; // variable globale pour indiquer si les moteurs doivent être reset
 bool shouldDimLight =
     true; // variable globale pour indiquer si les LEDs doivent être atténuées
 
@@ -171,12 +173,26 @@ void motor_Task(void *pvParameter) {
 
   while (1) {
     current_time = esp_timer_get_time();
-    minute_clock_wheel.Update(current_time);
-    hour_clock_wheel.Update(current_time);
-    day_clock_wheel.Update(current_time);
+
+    bool mSwitchUp = gpio_get_level(kMinuteSwitchUpPin);
+    bool hSwitchUp = gpio_get_level(kHourSwitchUpPin);
+    bool dSwitchUp = gpio_get_level(kDaySwitchUpPin);
+
+    bool mSwitchDown = gpio_get_level(kMinuteSwitchDownPin);
+    bool hSwitchDown = gpio_get_level(kHourSwitchDownPin);
+    bool dSwitchDown = gpio_get_level(kDaySwitchDownPin);
+
+    // à cause du pull up le résultat est 1 (true) quand le switch est neutre.
+    shouldReset = !(mSwitchUp || hSwitchUp || dSwitchUp) &&
+                  (mSwitchDown && hSwitchDown && dSwitchDown);
+
+    minute_clock_wheel.Update(current_time, shouldReset);
+    hour_clock_wheel.Update(current_time, shouldReset);
+    day_clock_wheel.Update(current_time, shouldReset);
     vTaskDelay(pdMS_TO_TICKS(kLoopDelayMs)); // attendre 12ms
   }
 }
+
 extern "C" {
 void app_main(void);
 }

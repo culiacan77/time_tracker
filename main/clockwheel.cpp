@@ -31,15 +31,23 @@ void ClockWheel::SetTimeOrigin(int64_t current_time) {
   time_origin_ = current_time;
 }
 
-void ClockWheel::Update(int64_t current_time) {
+void ClockWheel::Update(int64_t current_time, bool should_reset) {
+
   // read the switch states
   int switch_up_state = gpio_get_level(switch_up_);
   int switch_down_state = gpio_get_level(switch_down_);
 
-  // mode : 3 = no switch pressed
+  // mode : 0 = minute hour day switch up (reset)
   //        1 = down switch pressed (clockwise)
-  //        2 = up switch pressed (reset)
+  //        2 = up switch pressed (counterclockwise)
+  //        3 = no switch pressed
   int mode = switch_up_state << 1 | switch_down_state;
+
+  // override le mode si bool reset true
+  if (should_reset) {
+    mode = 0;
+  };
+
   int64_t elapsed_time = current_time - time_origin_;
 
   int targetPosition =
@@ -47,32 +55,39 @@ void ClockWheel::Update(int64_t current_time) {
       motor_.steps_per_rotation_;
 
   switch (mode) {
-  case 3: // normal operation (turn if needed)
+    // up switch pressed: reset
+  case 0: {
+    SetLedColor(kRed);
+    motor_.ResetStep();
+    time_origin_ = current_time;
+    current_position_ = 0;
+    break;
+  }
+  // down switch pressed (clockwise)
+  case 1: {
+    SetLedColor(kYellow);
+    motor_.Step(true);
+    time_origin_ = current_time;
+    current_position_ = 0;
+    break;
+  }
+  // up switch pressed (counterclockwise)
+  case 2: {
+    SetLedColor(kBlue);
+    motor_.Step(false);
+    time_origin_ = current_time;
+    current_position_ = 0;
+    break;
+  }
+  // normal operation (turn if needed)
+  case 3: {
     SetLedColor(kWhite);
     if (current_position_ != targetPosition) {
       motor_.Step(true);
       current_position_ = (current_position_ + 1) % motor_.steps_per_rotation_;
     }
     break;
-  case 1: // down switch pressed (clockwise)
-    SetLedColor(kBlue);
-    motor_.Step(true);
-    time_origin_ = current_time;
-    current_position_ = 0;
-    break;
-  case 2:
-    // up switch pressed: reset
-    int turned = motor_.ResetStep();
-    if (turned > 0) {
-      SetLedColor(kRed);
-    } else if (turned < 0) {
-      SetLedColor(kGreen);
-    } else {
-      SetLedColor(kYellow);
-    }
-    time_origin_ = current_time;
-    current_position_ = 0;
-    break;
+  }
   }
 }
 
