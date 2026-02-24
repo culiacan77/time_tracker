@@ -4,6 +4,7 @@
 
 #pragma once
 
+#include "buttonpanel.hpp"
 #include "driver/gpio.h"
 #include "led_strip.h"
 #include "stepper-motor.hpp"
@@ -16,17 +17,17 @@ class ClockWheel {
 public:
   /**
    * Create a clock wheel with switch inputs and motor control.
-   * @param Switch_up GPIO pin for up button.
-   * @param Switch_down GPIO pin for down button.
    * @param motor_update_frequency Update frequency in microseconds.
    * @param motor Reference to stepper motor driver.
+   * @param buttonPanelReference Reference to button panel (for switch buton
+   * state).
+   * @param clockWheelIndex Index of the clock wheel (minute=0, hour=1, day=2).
    * @param time_origin Optional initial time reference (default: 0).
    * @param led_strip Optional LED ring handle for color display (default:
    * nullptr).
-   * @param should_reset boolean evaluated in task, used to trigger reset.
    */
-  ClockWheel(gpio_num_t Switch_up, gpio_num_t Switch_down,
-             int64_t motor_update_frequency, StepperMotor &motor,
+  ClockWheel(int64_t motor_update_frequency, StepperMotor &motor,
+             ButtonPanel &buttonPanelReference, int clockWheelIndex,
              int64_t time_origin = 0, led_strip_handle_t led_strip = nullptr);
 
   /**
@@ -40,7 +41,7 @@ public:
    * @param current_time Current time in microseconds.
    * @param should_reset Boolean flag to indicate if motor should be reset.
    */
-  void Update(int64_t current_time, bool should_reset);
+  void Update(int64_t current_time);
 
   /**
    * Set the color of the LED ring.
@@ -49,11 +50,13 @@ public:
   void SetLedColor(uint32_t color);
 
 private:
-  StepperMotor &motor_; // composition, clockwheel HAS A motor
-  gpio_num_t switch_up_;
-  gpio_num_t switch_down_;
+  // l'ordre dois correspondre à celui des parametres du constructeur
   int64_t motor_update_frequency_;
+  StepperMotor &motor_;               // composition, clockwheel HAS A motor
+  ButtonPanel &buttonPanelReference_; // référence vers la classe buttonpanel
+  int clockWheelIndex_;
   int64_t time_origin_;
   led_strip_handle_t led_strip_;
+
   int current_position_ = 0;
 };

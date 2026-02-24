@@ -6,7 +6,8 @@
 
 #include <vector>
 
-#include "clockwheel.hpp" //pk pas besoin de include Clockwheel.cpp ?
+#include "buttonpanel.hpp"
+#include "clockwheel.hpp"
 #include "driver/gpio.h" //permet de paramettrer les gpio en tant qu'input/output, pupllup/pulldown
 #include "esp_err.h"
 #include "esp_log.h"
@@ -77,14 +78,26 @@ constexpr int64_t kMotorMinuteFrequency = 60e6; // 60 * 10^6
 constexpr int64_t kMotorHourFrequency = kMotorMinuteFrequency * 60;
 constexpr int64_t kMotorDayFrequency = kMotorHourFrequency * 24;
 
+constexpr int clockWheelMinuteIndex = 0;
+constexpr int clockWheelHourIndex = 1;
+constexpr int clockWheelDayIndex = 2;
+
 constexpr int kUpdateDelayMs = 50; // delay time in ms for the led panel update
 
 static constexpr int kLedPanelLeds = 9; // nbr LEDs dans le panneau
 
-bool shouldReset =
-    false; // variable globale pour indiquer si les moteurs doivent être reset
 bool shouldDimLight =
     true; // variable globale pour indiquer si les LEDs doivent être atténuées
+
+// initialisation d'un objet ButtonPanel dans lequel on stockera les pins des
+// switchs.
+ButtonPanel buttonpanel(kMinuteSwitchUpPin, kMinuteSwitchDownPin,
+                        kHourSwitchUpPin, kHourSwitchDownPin, kDaySwitchUpPin,
+                        kDaySwitchDownPin, kLedPanelSwitchUp,
+                        kLedPanelSwitchDown);
+
+// déclaration d'un pointeur vers un objet ButtonPanel
+ButtonPanel &buttonPanelPointer = buttonpanel;
 
 //  --------TASK DEFINITION--------
 void ledPanel_Task(void *pvParameter) {
@@ -154,41 +167,29 @@ void motor_Task(void *pvParameter) {
   StepperMotor4P minute_stepper_motor(kMotorStepNumber, kMinuteMotorPin1,
                                       kMinuteMotorPin3, kMinuteMotorPin2,
                                       kMinuteMotorPin4);
-  ClockWheel minute_clock_wheel(kMinuteSwitchUpPin, kMinuteSwitchDownPin,
-                                kMotorMinuteFrequency, minute_stepper_motor,
+  ClockWheel minute_clock_wheel(kMotorMinuteFrequency, minute_stepper_motor,
+                                buttonPanelPointer, clockWheelMinuteIndex,
                                 current_time, led_strip);
 
   StepperMotor4P hour_stepper_motor(kMotorStepNumber, kHourMotorPin1,
                                     kHourMotorPin3, kHourMotorPin2,
                                     kHourMotorPin4);
-  ClockWheel hour_clock_wheel(kHourSwitchUpPin, kHourSwitchDownPin,
-                              kMotorHourFrequency, hour_stepper_motor,
+  ClockWheel hour_clock_wheel(kMotorHourFrequency, hour_stepper_motor,
+                              buttonPanelPointer, clockWheelHourIndex,
                               current_time);
 
   StepperMotor4P day_stepper_motor(kMotorStepNumber, kDayMotorPin1,
                                    kDayMotorPin3, kDayMotorPin2, kDayMotorPin4);
-  ClockWheel day_clock_wheel(kDaySwitchUpPin, kDaySwitchDownPin,
-                             kMotorDayFrequency, day_stepper_motor,
+  ClockWheel day_clock_wheel(kMotorDayFrequency, day_stepper_motor,
+                             buttonPanelPointer, clockWheelDayIndex,
                              current_time);
 
   while (1) {
     current_time = esp_timer_get_time();
 
-    bool mSwitchUp = gpio_get_level(kMinuteSwitchUpPin);
-    bool hSwitchUp = gpio_get_level(kHourSwitchUpPin);
-    bool dSwitchUp = gpio_get_level(kDaySwitchUpPin);
-
-    bool mSwitchDown = gpio_get_level(kMinuteSwitchDownPin);
-    bool hSwitchDown = gpio_get_level(kHourSwitchDownPin);
-    bool dSwitchDown = gpio_get_level(kDaySwitchDownPin);
-
-    // à cause du pull up le résultat est 1 (true) quand le switch est neutre.
-    shouldReset = !(mSwitchUp || hSwitchUp || dSwitchUp) &&
-                  (mSwitchDown && hSwitchDown && dSwitchDown);
-
-    minute_clock_wheel.Update(current_time, shouldReset);
-    hour_clock_wheel.Update(current_time, shouldReset);
-    day_clock_wheel.Update(current_time, shouldReset);
+    minute_clock_wheel.Update(current_time);
+    hour_clock_wheel.Update(current_time);
+    day_clock_wheel.Update(current_time);
     vTaskDelay(pdMS_TO_TICKS(kLoopDelayMs)); // attendre 12ms
   }
 }
