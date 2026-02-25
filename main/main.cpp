@@ -127,8 +127,7 @@ void ledPanel_Task(void *pvParameter) {
   ESP_ERROR_CHECK(led_strip_new_rmt_device(&ledPanel_strip_config, &rmt_config,
                                            &ledPanel_led_strip));
 
-  LedPanel myLedPanel(kLedPanelSwitchUp, kLedPanelSwitchDown, kLedPanelPin,
-                      ledPanel_led_strip);
+  LedPanel myLedPanel(buttonPanelPointer, kLedPanelPin, ledPanel_led_strip);
   // confiure trail length and fill trail brightness vector
   myLedPanel.setTrailLength(6);
 

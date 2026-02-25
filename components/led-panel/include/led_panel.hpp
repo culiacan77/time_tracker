@@ -4,6 +4,7 @@
 
 #pragma once
 
+#include "buttonpanel.hpp"
 #include "driver/gpio.h"
 #include "led_strip.h"
 #include <vector>
@@ -18,7 +19,7 @@ constexpr uint64_t KFULLLIT = 0x123456789;
 
 class LedPanel {
 public:
-  LedPanel(gpio_num_t switch_up, gpio_num_t switch_down, gpio_num_t gpioPin,
+  LedPanel(ButtonPanel &buttonPanelReference, gpio_num_t gpioPin,
            led_strip_handle_t led_strip_handle);
 
   /**
@@ -38,13 +39,13 @@ public:
 
 protected:
 private:
+  // référence vers la classe buttonpanel
+  ButtonPanel &buttonPanelReference_;
   // matrice représentant l'indice de luminosité du led panel
   std::vector<std::vector<int>> ledPanelMatrix_{
       {0, 0, 0}, {0, 0, 0}, {0, 0, 0}};
   std::vector<std::vector<int>> LightingPattern_;
   std::vector<int> BrightnessLUT_;
-  gpio_num_t switch_up_;
-  gpio_num_t switch_down_;
   led_strip_handle_t led_strip_handle_;
 
   bool shouldDimLight_ =

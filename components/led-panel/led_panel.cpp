@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: MIT
 
 #include "led_panel.hpp"
+#include "buttonpanel.hpp"
 #include "driver/gpio.h"
 #include "esp_log.h"
 
@@ -54,18 +55,11 @@ static const char *kTag = "led_panel";
 const int HueRange = 360;
 
 // constructeur
-LedPanel::LedPanel(gpio_num_t switch_up, gpio_num_t switch_down,
-                   gpio_num_t gpioPin, led_strip_handle_t led_strip_handle)
-    : switch_up_(switch_up), switch_down_(switch_down),
+LedPanel::LedPanel(ButtonPanel &buttonPanelReference, gpio_num_t gpioPin,
+                   led_strip_handle_t led_strip_handle)
+    : buttonPanelReference_(buttonPanelReference),
       led_strip_handle_(led_strip_handle) {
   LightingPattern_ = kLightPatternRun;
-  gpio_config_t io_conf = {};
-  io_conf.intr_type = GPIO_INTR_DISABLE;
-  io_conf.mode = GPIO_MODE_INPUT;
-  io_conf.pin_bit_mask = (1ULL << switch_up_) | (1ULL << switch_down_);
-  io_conf.pull_down_en = GPIO_PULLDOWN_DISABLE;
-  io_conf.pull_up_en = GPIO_PULLUP_ENABLE;
-  ESP_ERROR_CHECK(gpio_config(&io_conf));
 
   ESP_LOGI(kTag, "Created Panel LED strip object");
 };
@@ -156,31 +150,17 @@ void LedPanel::shiftLedColor() {
 };
 
 void LedPanel::update() {
-  int switch_up_state = gpio_get_level(switch_up_);
-  int switch_down_state = gpio_get_level(switch_down_);
 
-  // mode : 3 = switch neutral position (run normal)
-  //        1 = switch left position (stop clockwheel)
-  //        2 = switch right position (change led color)
-  int mode = switch_up_state << 1 | switch_down_state;
-
-  switch (mode) {
-  case 3: // normal operation
-    this->setAnimationPattern(kLightPatternRun);
-
-    break;
-  case 1: // switch left position (stop clockwheel)
+  if (buttonPanelReference_.shouldPause()) {
     this->setAnimationPattern(kLightPatternStop);
-
-    break;
-  case 2: // switch right position (change led color)
+  } else if (buttonPanelReference_.shouldChangeColor()) {
     this->setAnimationPattern(kFullLit);
     this->shiftLedColor();
-
-    break;
+  } else {
+    this->setAnimationPattern(kLightPatternRun);
   }
-};
-// problème: light trail devra etre défini de par l'exterieur.
-// faire en sorte d'avoir une fonction qui parcour le tableau et lui donner un
-// pointeur vers une fonction dans sa définition. lors de son appel on pourra
-// donner la fonction dim / clear our lit comme argument.
+}
+
+// idée: faire en sorte d'avoir une fonction qui parcour le tableau et lui
+// donner un pointeur vers une fonction dans sa définition. lors de son appel on
+// pourra donner la fonction dim / clear our lit comme argument.
