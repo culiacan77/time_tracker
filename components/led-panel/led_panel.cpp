@@ -34,8 +34,8 @@ static const int kGammaCorrection[] = {
     255};
 
 static constexpr int kBrightnessMax_ =
-    100; // Valeur maximale de luminosité, low brightness limit available tint
-
+    170; // Valeur maximale de luminosité, low brightness limit available tint
+static constexpr int kBrightnessLowTreshold_ = 25;
 // liste position des leds à allumer selon le pattern
 // mode pause
 static const std::vector<std::vector<int>> kLightPatternStop = {
@@ -74,6 +74,9 @@ void LedPanel::setAnimationPattern(
 void LedPanel::setTrailLength(int trailLength) {
   if (trailLength < 2) {
     trailLength = 2;
+    if (trailLength > ledPanelMatrix_.size()) {
+      trailLength = ledPanelMatrix_.size();
+    }
   }
   // vide le vecteur BrightnessLUT_
   BrightnessLUT_.clear();
@@ -81,7 +84,9 @@ void LedPanel::setTrailLength(int trailLength) {
   for (int i = 0; i < trailLength; i++) {
     // recuperer la valeur du tableau gamma à la position de brightnessInterval
     // * (i + 1)
-    int brightness = i * kBrightnessMax_ / (trailLength - 1);
+    int brightness =
+        i * (kBrightnessMax_ - kBrightnessLowTreshold_) / (trailLength - 1) +
+        kBrightnessLowTreshold_;
     BrightnessLUT_.push_back(kGammaCorrection[brightness]);
   }
 };
@@ -95,31 +100,45 @@ void LedPanel::clearLedPanelMatrix() {
   }
 };
 
-void LedPanel::updateMatrix(bool shouldDimLight_) {
-  int rowIndex = LightingPatternIndex_ % (LightingPattern_).size();
-  int rowValue = (LightingPattern_)[rowIndex][0];
-  int columnValue = (LightingPattern_)[rowIndex][1];
-  // lightTrail est aussi la valeur de brightness max
-  ledPanelMatrix_[rowValue][columnValue] = BrightnessLUT_.size();
-  // La valeur qu'on vient d'assigner dans notre matrix est plus grande de 1
-  // que l'index des elements de notre vecteur LUT, mais la suite va
-  // soustraire 1 à toutes les valeurs (ce qui gère la baisse d'intensité de
-  // la trainée). Donc si on a mit 3 dans le tableau, on se retrouve avec 2,
-  // ce qui permet d'accéder au 2ème élément du vecteur
-  if (shouldDimLight_) {
-    int n = ledPanelMatrix_.size();
-    for (int i = 0; i < n; ++i) {   // i est l'indice de ligne (row)
-      for (int j = 0; j < n; ++j) { // j est l'indice de colonne (column)
+void LedPanel::updateMatrix() {
+  int n = ledPanelMatrix_.size();
 
+  if (shouldDimLight_) {
+    // --- LOGIQUE ANIMATION (TRAINÉE) ---
+    int rowIndex = LightingPatternIndex_ % LightingPattern_.size();
+    int rowValue = LightingPattern_[rowIndex][0];
+    int columnValue = LightingPattern_[rowIndex][1];
+
+    // On place le nouveau point à l'index de luminosité max
+    ledPanelMatrix_[rowValue][columnValue] = BrightnessLUT_.size() - 1;
+
+    // On diminue l'intensité des autres points
+    for (int i = 0; i < n; ++i) {
+      for (int j = 0; j < n; ++j) {
         if (ledPanelMatrix_[i][j] > 0) {
-          // décrémente l'index de luminosité
           ledPanelMatrix_[i][j]--;
         }
       }
     }
+    LightingPatternIndex_++;
+  } else {
+    // --- LOGIQUE STATIQUE (PAUSE / COULEUR) ---
+    // 1. On éteint tout d'abord
+    for (int i = 0; i < n; ++i) {
+      for (int j = 0; j < n; ++j) {
+        ledPanelMatrix_[i][j] = 0;
+      }
+    }
+
+    // 2. On allume UNIQUEMENT les points du pattern actuel
+    for (const auto &coord : LightingPattern_) {
+      int r = coord[0];
+      int c = coord[1];
+      // On utilise l'index max du LUT pour que ce soit bien brillant
+      ledPanelMatrix_[r][c] = BrightnessLUT_.size() - 1;
+    }
   }
-  LightingPatternIndex_++;
-};
+}
 
 void LedPanel::litLedPanel() {
 
@@ -152,15 +171,25 @@ void LedPanel::shiftLedColor() {
 void LedPanel::update() {
 
   if (buttonPanelReference_.shouldPause()) {
+    shouldDimLight_ = false;
     this->setAnimationPattern(kLightPatternStop);
+    // this->clearLedPanelMatrix();
   } else if (buttonPanelReference_.shouldChangeColor()) {
+    shouldDimLight_ = false;
     this->setAnimationPattern(kFullLit);
     this->shiftLedColor();
+  } else if (buttonPanelReference_.shouldReset()) {
+    shouldDimLight_ = true;
+    this->setAnimationPattern(kLightPatternReset);
   } else {
+    shouldDimLight_ = true;
     this->setAnimationPattern(kLightPatternRun);
   }
 }
 
-// idée: faire en sorte d'avoir une fonction qui parcour le tableau et lui
-// donner un pointeur vers une fonction dans sa définition. lors de son appel on
-// pourra donner la fonction dim / clear our lit comme argument.
+// comprendre comment est crée le LUT qui semble t'il rempli la matrix et le
+// lien entre lui et le gamma. bref comment on détermine l'intensité le fait
+// que de base la valeur dans la matrixe est plus grande de 1 et qu'on corrige
+// ça lorsque shouldDimLight_ true va poser problème dans le cas ou les led
+// doivent rester allumées.
+// -> amélioration système:

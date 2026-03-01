@@ -134,8 +134,8 @@ void ledPanel_Task(void *pvParameter) {
   while (1) {
     vTaskDelay(pdMS_TO_TICKS(100)); // provisoire. Devra être géré par la task
     myLedPanel.update();
-    myLedPanel.updateMatrix(true); // remplacer true par shouldDimLight, ajout
-                                   // en tant que parametre de task ?
+    myLedPanel.updateMatrix(); // remplacer true par shouldDimLight, ajout
+                               // en tant que parametre de task ?
     myLedPanel.litLedPanel();
   }
 }

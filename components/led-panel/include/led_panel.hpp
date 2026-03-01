@@ -32,7 +32,7 @@ public:
   void
   setAnimationPattern(const std::vector<std::vector<int>> &currentLightPattern);
   void setTrailLength(int trailLength);
-  void updateMatrix(bool shouldDimLight_);
+  void updateMatrix();
   void clearLedPanelMatrix();
   void shiftLedColor();
   void update();

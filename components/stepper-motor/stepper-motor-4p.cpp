@@ -46,10 +46,7 @@ StepperMotor4P::StepperMotor4P(int steps_per_rotation, gpio_num_t motor_pin_0,
 void StepperMotor4P::Step(bool clockwise) {
   StepperMotor::Step(clockwise);
 
-  // Switch off all pins
-  for (int i = 0; i < StepperMotor4P::kNumberOfPins; i++) {
-    ESP_ERROR_CHECK(gpio_set_level(motor_pins_[i], 0));
-  }
+  this->Sleep(); // Ensure all pins are off before setting the new step
 
   // Set pins according to the current step in the sequence
   uint8_t current_sequence = kSequenceArray[current_step_ % kSequenceLen];
@@ -59,4 +56,11 @@ void StepperMotor4P::Step(bool clockwise) {
     }
   }
   ESP_LOGD(kTag, "Current step: %d", current_step_);
+}
+
+void StepperMotor4P::Sleep() {
+  // Switch off all pins
+  for (int i = 0; i < StepperMotor4P::kNumberOfPins; i++) {
+    ESP_ERROR_CHECK(gpio_set_level(motor_pins_[i], 0));
+  }
 }
