@@ -11,6 +11,7 @@ constexpr uint32_t kRed = 0x220000;
 constexpr uint32_t kGreen = 0x002200;
 constexpr uint32_t kBlue = 0x000022;
 constexpr uint32_t kYellow = 0x222200;
+constexpr uint32_t kPurple = 0x8800FF;
 constexpr uint64_t kSleepDelay =
     50; // miliseconds to wait before putting motor to sleep
 
@@ -42,6 +43,7 @@ void ClockWheel::Update(int64_t current_time) {
   } else if (buttonPanelReference_.shouldReset()) {
     SetLedColor(kRed);
     motor_.ResetStep();
+    last_step_time = current_time;
     time_origin_ = current_time;
     current_position_ = 0;
   } else if (buttonPanelReference_.shouldTurnCW(clockWheelIndex_)) {
@@ -67,6 +69,7 @@ void ClockWheel::Update(int64_t current_time) {
   }
   if (current_time - last_step_time > kSleepDelay) {
     // if no step has been taken for more than 1ms, put the motor to sleep
+    SetLedColor(kBlue);
     motor_.Sleep();
   }
 }

@@ -41,29 +41,29 @@ static const char *kTag = "main";
 // }
 //}
 
-constexpr gpio_num_t kMinuteMotorPin1 = GPIO_NUM_1;
-constexpr gpio_num_t kMinuteMotorPin2 = GPIO_NUM_5;
-constexpr gpio_num_t kMinuteMotorPin3 = GPIO_NUM_6;
-constexpr gpio_num_t kMinuteMotorPin4 = GPIO_NUM_7;
+constexpr gpio_num_t kMinuteMotorPin1 = GPIO_NUM_11;
+constexpr gpio_num_t kMinuteMotorPin2 = GPIO_NUM_13;
+constexpr gpio_num_t kMinuteMotorPin3 = GPIO_NUM_12;
+constexpr gpio_num_t kMinuteMotorPin4 = GPIO_NUM_4;
 
-constexpr gpio_num_t kHourMotorPin1 = GPIO_NUM_8;
-constexpr gpio_num_t kHourMotorPin2 = GPIO_NUM_10;
-constexpr gpio_num_t kHourMotorPin3 = GPIO_NUM_9;
-constexpr gpio_num_t kHourMotorPin4 = GPIO_NUM_14;
+constexpr gpio_num_t kHourMotorPin1 = GPIO_NUM_1;
+constexpr gpio_num_t kHourMotorPin2 = GPIO_NUM_5;
+constexpr gpio_num_t kHourMotorPin3 = GPIO_NUM_6;
+constexpr gpio_num_t kHourMotorPin4 = GPIO_NUM_7;
 
-constexpr gpio_num_t kDayMotorPin1 = GPIO_NUM_11;
-constexpr gpio_num_t kDayMotorPin2 = GPIO_NUM_13;
-constexpr gpio_num_t kDayMotorPin3 = GPIO_NUM_12;
-constexpr gpio_num_t kDayMotorPin4 = GPIO_NUM_4;
+constexpr gpio_num_t kDayMotorPin1 = GPIO_NUM_8;
+constexpr gpio_num_t kDayMotorPin2 = GPIO_NUM_10;
+constexpr gpio_num_t kDayMotorPin3 = GPIO_NUM_9;
+constexpr gpio_num_t kDayMotorPin4 = GPIO_NUM_14;
 
 constexpr gpio_num_t kStatusLedPin = GPIO_NUM_47;
 
-constexpr gpio_num_t kMinuteSwitchUpPin = GPIO_NUM_21;
-constexpr gpio_num_t kMinuteSwitchDownPin = GPIO_NUM_17;
-constexpr gpio_num_t kHourSwitchUpPin = GPIO_NUM_34;
-constexpr gpio_num_t kHourSwitchDownPin = GPIO_NUM_35;
-constexpr gpio_num_t kDaySwitchUpPin = GPIO_NUM_33;
-constexpr gpio_num_t kDaySwitchDownPin = GPIO_NUM_36;
+constexpr gpio_num_t kMinuteSwitchUpPin = GPIO_NUM_33;
+constexpr gpio_num_t kMinuteSwitchDownPin = GPIO_NUM_36;
+constexpr gpio_num_t kHourSwitchUpPin = GPIO_NUM_21;
+constexpr gpio_num_t kHourSwitchDownPin = GPIO_NUM_17;
+constexpr gpio_num_t kDaySwitchUpPin = GPIO_NUM_34;
+constexpr gpio_num_t kDaySwitchDownPin = GPIO_NUM_35;
 
 constexpr gpio_num_t kLedPanelSwitchUp = GPIO_NUM_16;
 constexpr gpio_num_t kLedPanelSwitchDown = GPIO_NUM_18;
@@ -74,9 +74,12 @@ constexpr int kLedStripRmtResHz = (10 * 1000 * 1000);
 constexpr int kLoopDelayMs = 12; // delay time in ms for the main loop
 constexpr int kMotorStepNumber = 2048;
 
-constexpr int64_t kMotorMinuteFrequency = 60e6; // 60 * 10^6
-constexpr int64_t kMotorHourFrequency = kMotorMinuteFrequency * 60;
-constexpr int64_t kMotorDayFrequency = kMotorHourFrequency * 24;
+constexpr int64_t kMotorMinuteFrequency =
+    60e6 * 60; // un tour par heure en microsecondes
+constexpr int64_t kMotorHourFrequency =
+    kMotorMinuteFrequency * 24; // un tour en 24h en microsecondes
+constexpr int64_t kMotorDayFrequency =
+    kMotorHourFrequency * 24; // un tour en 24j en microsecondes
 
 constexpr int clockWheelMinuteIndex = 0;
 constexpr int clockWheelHourIndex = 1;
